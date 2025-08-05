@@ -1,67 +1,154 @@
-import { hsvToRgb, rgbToBytes } from './colorUtils.js';
-
 /**
- * Canvas renderer for color spaces
+ * WebGL Canvas renderer for color spaces
  */
 export class CanvasRenderer {
-  constructor(canvas) {
+  constructor(canvas, vertexShaderSource, fragmentShaderSource) {
     this.canvas = canvas;
-    this.ctx = canvas.getContext('2d');
+    this.gl = canvas.getContext('webgl', { preserveDrawingBuffer: true });
+
+    if (!this.gl) {
+      throw new Error('WebGL not supported');
+    }
+
     this.width = canvas.width;
     this.height = canvas.height;
-    this.imageData = this.ctx.createImageData(this.width, this.height);
+
+    this.initWebGL(vertexShaderSource, fragmentShaderSource);
   }
 
   /**
-   * Render HSV color space with fixed hue
+   * Factory function to create a CanvasRenderer with shader loading
+   * @param {HTMLCanvasElement} canvas - The canvas element
+   * @returns {Promise<CanvasRenderer>} - Promise that resolves to initialized renderer
+   */
+  static async create(canvas) {
+    // Load shaders from files
+    const [vertexShaderSource, fragmentShaderSource] = await Promise.all([
+      fetch('./shaders/vertex.glsl').then(r => r.text()),
+      fetch('./shaders/fragment.glsl').then(r => r.text())
+    ]);
+
+    return new CanvasRenderer(canvas, vertexShaderSource, fragmentShaderSource);
+  }
+
+  /**
+   * Initialize WebGL shaders and buffers
+   */
+  initWebGL(vertexShaderSource, fragmentShaderSource) {
+    // Create and compile shaders
+    this.vertexShader = this.createShader(this.gl.VERTEX_SHADER, vertexShaderSource);
+    this.fragmentShader = this.createShader(this.gl.FRAGMENT_SHADER, fragmentShaderSource);
+
+    // Create and link program
+    this.program = this.createProgram(this.vertexShader, this.fragmentShader);
+
+    // Get attribute and uniform locations
+    this.positionLocation = this.gl.getAttribLocation(this.program, 'a_position');
+    this.texCoordLocation = this.gl.getAttribLocation(this.program, 'a_texCoord');
+    this.hueLocation = this.gl.getUniformLocation(this.program, 'u_hue');
+
+    // Create buffers, set up vertex attributes, and set viewport
+    this.setupBuffersAndAttributes();
+    this.gl.viewport(0, 0, this.width, this.height);
+  }
+
+  /**
+   * Create and compile a shader
+   */
+  createShader(type, source) {
+    const shader = this.gl.createShader(type);
+    this.gl.shaderSource(shader, source);
+    this.gl.compileShader(shader);
+
+    if (!this.gl.getShaderParameter(shader, this.gl.COMPILE_STATUS)) {
+      console.error('Error compiling shader:', this.gl.getShaderInfoLog(shader));
+      this.gl.deleteShader(shader);
+      return null;
+    }
+
+    return shader;
+  }
+
+  /**
+   * Create and link shader program
+   */
+  createProgram(vertexShader, fragmentShader) {
+    const program = this.gl.createProgram();
+    this.gl.attachShader(program, vertexShader);
+    this.gl.attachShader(program, fragmentShader);
+    this.gl.linkProgram(program);
+
+    if (!this.gl.getProgramParameter(program, this.gl.LINK_STATUS)) {
+      console.error('Error linking program:', this.gl.getProgramInfoLog(program));
+      this.gl.deleteProgram(program);
+      return null;
+    }
+
+    return program;
+  }
+
+  /**
+   * Set up vertex buffer and attributes (done once during initialization)
+   */
+  setupBuffersAndAttributes() {
+    const gl = this.gl;
+
+    // Full screen quad vertices and texture coordinates
+    const quadData = new Float32Array([
+      -1.0, -1.0, 0.0, 0.0,  // bottom-left
+      1.0, -1.0, 1.0, 0.0,  // bottom-right
+      -1.0, 1.0, 0.0, 1.0,  // top-left
+      1.0, 1.0, 1.0, 1.0,  // top-right
+    ]);
+
+    // Create and bind buffer
+    this.quadBuffer = gl.createBuffer();
+    gl.bindBuffer(gl.ARRAY_BUFFER, this.quadBuffer);
+    gl.bufferData(gl.ARRAY_BUFFER, quadData, gl.STATIC_DRAW);
+
+    // Set up vertex attributes
+    gl.enableVertexAttribArray(this.positionLocation);
+    gl.vertexAttribPointer(this.positionLocation, 2, gl.FLOAT, false, 16, 0);
+
+    gl.enableVertexAttribArray(this.texCoordLocation);
+    gl.vertexAttribPointer(this.texCoordLocation, 2, gl.FLOAT, false, 16, 8);
+  }
+
+  /**
+   * Render HSV color space with fixed hue using WebGL
    * @param {number} fixedHue - Hue value (0-360)
    */
   renderHsvSpace(fixedHue = 180) {
-    const data = this.imageData.data;
-
-    for (let y = 0; y < this.height; y++) {
-      for (let x = 0; x < this.width; x++) {
-        // Map canvas coordinates to HSV values
-        const saturation = x / this.width; // 0 to 1
-        const value = 1 - (y / this.height); // 1 to 0 (top to bottom)
-
-        // Convert HSV to RGB (0-1 values)
-        const rgb = hsvToRgb(fixedHue, saturation, value);
-        const rgbBytes = rgbToBytes(rgb.r, rgb.g, rgb.b);
-
-        // Set pixel data
-        const index = (y * this.width + x) * 4;
-        data[index] = rgbBytes.r;     // Red
-        data[index + 1] = rgbBytes.g; // Green
-        data[index + 2] = rgbBytes.b; // Blue
-        data[index + 3] = 255;        // Alpha
-      }
-    }
-
-    // Draw the image data to canvas
-    this.ctx.putImageData(this.imageData, 0, 0);
+    this.gl.useProgram(this.program);
+    this.gl.uniform1f(this.hueLocation, fixedHue);
+    this.gl.drawArrays(this.gl.TRIANGLE_STRIP, 0, 4);
   }
 
   /**
-   * Get color at canvas coordinates
+   * Get color at canvas coordinates by reading from the canvas
    * @param {number} x - X coordinate
    * @param {number} y - Y coordinate
-   * @param {number} fixedHue - Current fixed hue value
    * @returns {Object} RGB color {r, g, b} (0-1 values)
    */
-  getColorAt(x, y, fixedHue = 180) {
-    // Map canvas coordinates to HSV values
-    const saturation = x / this.width;
-    const value = 1 - (y / this.height);
+  getColorAt(x, y) {
+    const gl = this.gl;
 
-    // Convert HSV to RGB (returns 0-1 values)
-    return hsvToRgb(fixedHue, saturation, value);
-  }
+    // Clamp coordinates to canvas bounds
+    x = Math.max(0, Math.min(x, this.width - 1));
+    y = Math.max(0, Math.min(y, this.height - 1));
 
-  /**
-   * Clear the canvas
-   */
-  clear() {
-    this.ctx.clearRect(0, 0, this.width, this.height);
+    // WebGL coordinates are flipped vertically
+    const glY = this.height - 1 - y;
+
+    // Read pixel data from framebuffer
+    const pixels = new Uint8Array(4);
+    gl.readPixels(x, glY, 1, 1, gl.RGBA, gl.UNSIGNED_BYTE, pixels);
+
+    // Convert from 0-255 to 0-1
+    return {
+      r: pixels[0] / 255,
+      g: pixels[1] / 255,
+      b: pixels[2] / 255
+    };
   }
 }

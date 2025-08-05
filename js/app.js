@@ -7,14 +7,14 @@ import { UIController } from './uiController.js';
 class ColorSpaceExplorer {
   constructor() {
     this.canvas = document.getElementById('colorCanvas');
-    this.renderer = new CanvasRenderer(this.canvas);
     this.uiController = new UIController();
     this.fixedHue = 180; // Default hue (cyan)
-
-    this.init();
   }
 
-  init() {
+  async init() {
+    // Create renderer with async factory
+    this.renderer = await CanvasRenderer.create(this.canvas);
+
     // Render initial color space
     this.renderer.renderHsvSpace(this.fixedHue);
 
@@ -33,7 +33,7 @@ class ColorSpaceExplorer {
       const y = event.clientY - rect.top;
 
       // Get color at mouse position
-      const color = this.renderer.getColorAt(x, y, this.fixedHue);
+      const color = this.renderer.getColorAt(x, y);
 
       // Update UI
       this.uiController.updateHoveredColor(color);
@@ -47,6 +47,7 @@ class ColorSpaceExplorer {
 }
 
 // Initialize the application when DOM is loaded
-document.addEventListener('DOMContentLoaded', () => {
-  new ColorSpaceExplorer();
+document.addEventListener('DOMContentLoaded', async () => {
+  const app = new ColorSpaceExplorer();
+  await app.init();
 });
