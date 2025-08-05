@@ -42,6 +42,86 @@ body {
   letter-spacing: 0.05em;
 }
 
+.control-section {
+  margin-bottom: 24px;
+}
+
+.control-group {
+  margin-bottom: 16px;
+}
+
+.control-label {
+  display: block;
+  color: #9ca3af;
+  font-size: 12px;
+  font-weight: 500;
+  margin-bottom: 8px;
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+}
+
+.axis-selector {
+  display: flex;
+  background: #374151;
+  border-radius: 6px;
+  padding: 2px;
+  gap: 2px;
+}
+
+.axis-button {
+  flex: 1;
+  padding: 8px 12px;
+  background: transparent;
+  border: none;
+  color: #9ca3af;
+  font-size: 12px;
+  font-weight: 500;
+  border-radius: 4px;
+  cursor: pointer;
+  transition: all 0.2s ease;
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+}
+
+.axis-button:hover {
+  color: #d1d5db;
+  background: #4b5563;
+}
+
+.axis-button.active {
+  background: #6366f1;
+  color: #ffffff;
+}
+
+.axis-button.active:hover {
+  background: #5855eb;
+}
+
+.slider-container {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+}
+
+.value-slider {
+  flex: 1;
+  height: 6px;
+  border-radius: 3px;
+  background: #374151;
+  border: 1px solid #4b5563;
+  outline: none;
+  cursor: pointer;
+  appearance: none;
+}
+
+.slider-value {
+  color: #d1d5db;
+  font-family: 'Monaco', monospace;
+  font-size: 12px;
+  min-width: 40px;
+  text-align: right;
+}
+
 .color-info {
   display: flex;
   align-items: center;

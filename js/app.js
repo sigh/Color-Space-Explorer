@@ -1,5 +1,6 @@
 import { CanvasRenderer } from './canvasRenderer.js';
 import { UIController } from './uiController.js';
+import { ColorSpaceView, HsvColorSpace, Axis } from './colorSpace.js';
 
 /**
  * Main application class
@@ -8,21 +9,35 @@ class ColorSpaceExplorer {
   constructor() {
     this.canvas = document.getElementById('colorCanvas');
     this.uiController = new UIController();
-    this.fixedHue = 180; // Default hue (cyan)
+    this.hsvColorSpace = new HsvColorSpace();
   }
 
   async init() {
     // Create renderer with async factory
     this.renderer = await CanvasRenderer.create(this.canvas);
 
-    // Render initial color space
-    this.renderer.renderHsvSpace(this.fixedHue);
+    // Set up UI controller with callback
+    this.uiController.setColorSpaceChangeCallback((newColorSpaceView) => {
+      this.updateRenderer(newColorSpaceView);
+    });
 
-    // Set up mouse hover handling
+    // Create initial color space view with default hue axis
+    const initialColorSpaceView = new ColorSpaceView(
+      Axis.HUE,
+      this.hsvColorSpace.getDefaultValue(Axis.HUE)
+    );
+    this.uiController.setupAxisControls(this.hsvColorSpace, initialColorSpaceView);
+    this.updateRenderer(initialColorSpaceView);
+
+    // Set up mouse handlers
     this.setupMouseHandlers();
 
     // Set default UI state
     this.uiController.setDefaultColor();
+  }
+
+  updateRenderer(colorSpaceView) {
+    this.renderer.renderHsvSpace(colorSpaceView);
   }
 
   setupMouseHandlers() {

@@ -1,3 +1,5 @@
+import { Axis } from './colorSpace.js';
+
 /**
  * WebGL Canvas renderer for color spaces
  */
@@ -45,7 +47,8 @@ export class CanvasRenderer {
     // Get attribute and uniform locations
     this.positionLocation = this.gl.getAttribLocation(this.program, 'a_position');
     this.texCoordLocation = this.gl.getAttribLocation(this.program, 'a_texCoord');
-    this.hueLocation = this.gl.getUniformLocation(this.program, 'u_hue');
+    this.fixedValueLocation = this.gl.getUniformLocation(this.program, 'u_fixedValue');
+    this.axisModeLocation = this.gl.getUniformLocation(this.program, 'u_axisMode');
 
     // Create buffers, set up vertex attributes, and set viewport
     this.setupBuffersAndAttributes();
@@ -115,16 +118,35 @@ export class CanvasRenderer {
   }
 
   /**
-   * Render HSV color space with fixed hue using WebGL
-   * @param {number} fixedHue - Hue value (0-360)
+   * Render HSV color space with fixed axis using WebGL
+   * @param {ColorSpaceView} colorSpaceView - Immutable color space view
    */
-  renderHsvSpace(fixedHue = 180) {
+  renderHsvSpace(colorSpaceView) {
     this.gl.useProgram(this.program);
-    this.gl.uniform1f(this.hueLocation, fixedHue);
-    this.gl.drawArrays(this.gl.TRIANGLE_STRIP, 0, 4);
-  }
 
-  /**
+    const currentAxis = colorSpaceView.getCurrentAxis();
+    const fixedValue = colorSpaceView.getCurrentValue();
+
+    // Set axis mode: 0.0=hue, 1.0=saturation, 2.0=value
+    let axisMode;
+    switch (currentAxis) {
+      case Axis.HUE:
+        axisMode = 0.0;
+        break;
+      case Axis.SATURATION:
+        axisMode = 1.0;
+        break;
+      case Axis.VALUE:
+        axisMode = 2.0;
+        break;
+      default:
+        throw new Error(`Unknown axis: ${currentAxis}`);
+    }
+
+    this.gl.uniform1f(this.axisModeLocation, axisMode);
+    this.gl.uniform1f(this.fixedValueLocation, fixedValue);
+    this.gl.drawArrays(this.gl.TRIANGLE_STRIP, 0, 4);
+  }  /**
    * Get color at canvas coordinates by reading from the canvas
    * @param {number} x - X coordinate
    * @param {number} y - Y coordinate

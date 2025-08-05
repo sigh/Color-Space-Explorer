@@ -10,8 +10,29 @@
 
 <body>
   <div class="app-container">
-    <!-- Left Panel - Info -->
+    <!-- Left Panel - Controls -->
     <aside class="control-panel">
+      <section class="control-section">
+        <h3>Color Space View</h3>
+        <div class="control-group">
+          <label class="control-label">Fixed Axis</label>
+          <div class="axis-selector">
+            <button type="button" class="axis-button active" data-axis="hue">Hue</button>
+            <button type="button" class="axis-button" data-axis="saturation">Saturation</button>
+            <button type="button" class="axis-button" data-axis="value">Value</button>
+          </div>
+        </div>
+        <div class="control-group">
+          <label for="axisSlider" class="control-label">
+            <span id="axisLabel">Hue</span>
+          </label>
+          <div class="slider-container">
+            <input type="range" id="axisSlider" class="value-slider" min="0" max="360" value="180" step="1">
+            <span class="slider-value" id="axisValue">180°</span>
+          </div>
+        </div>
+      </section>
+
       <section class="control-section">
         <h3>Hovered Color</h3>
         <div class="color-info">
