@@ -1,0 +1,53 @@
+<!DOCTYPE html>
+<html lang="en">
+
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Color Space Explorer</title>
+  <link rel="stylesheet" href="css/styles.css">
+</head>
+
+<body>
+  <div class="app-container">
+    <!-- Left Panel - Info -->
+    <aside class="control-panel">
+      <section class="control-section">
+        <h3>Hovered Color</h3>
+        <div class="color-info">
+          <div class="color-swatch"></div>
+          <div class="color-values">
+            <div class="color-value">
+              <span class="color-label">RGB:</span>
+              <span class="color-data rgb-data">—</span>
+            </div>
+            <div class="color-value">
+              <span class="color-label">HSL:</span>
+              <span class="color-data hsl-data">—</span>
+            </div>
+            <div class="color-value">
+              <span class="color-label">HSV:</span>
+              <span class="color-data hsv-data">—</span>
+            </div>
+          </div>
+        </div>
+      </section>
+    </aside>
+
+    <!-- Center Panel - Canvas -->
+    <main class="canvas-panel">
+      <h1 class="app-title">Color Space Explorer</h1>
+      <canvas id="colorCanvas" width="400" height="400"></canvas>
+    </main>
+
+    <!-- Right Panel - Palette -->
+    <aside class="palette-panel">
+      <h2>Color Palette</h2>
+      <p class="placeholder-text">Palette functionality will be added here...</p>
+    </aside>
+  </div>
+
+  <script type="module" src="js/app.js"></script>
+</body>
+
+</html>
