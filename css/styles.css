@@ -60,7 +60,8 @@ body {
   letter-spacing: 0.05em;
 }
 
-.axis-selector {
+/* Segmented control container */
+.segmented-control {
   display: flex;
   background: #374151;
   border-radius: 6px;
@@ -68,32 +69,44 @@ body {
   gap: 2px;
 }
 
-.axis-button {
+.segmented-control .radio-button {
   flex: 1;
-  padding: 8px 12px;
+}
+
+.radio-button {
   background: transparent;
   border: none;
   color: #9ca3af;
   font-size: 12px;
   font-weight: 500;
-  border-radius: 4px;
   cursor: pointer;
   transition: all 0.2s ease;
   text-transform: uppercase;
   letter-spacing: 0.05em;
+  display: inline-block;
+  padding: 8px 12px;
+  border-radius: 4px;
 }
 
-.axis-button:hover {
+.radio-button input {
+  display: none;
+}
+
+.radio-button:hover {
   color: #d1d5db;
   background: #4b5563;
 }
 
-.axis-button.active {
+.radio-button input:checked~span {
+  color: #ffffff;
+}
+
+.radio-button:has(input:checked) {
   background: #6366f1;
   color: #ffffff;
 }
 
-.axis-button.active:hover {
+.radio-button:has(input:checked):hover {
   background: #5855eb;
 }
 
@@ -139,7 +152,13 @@ body {
   flex-shrink: 0;
   transition: opacity 0.2s ease;
   position: relative;
+  background-color: transparent;
   --show-indicator: 0.5;
+}
+
+.color-swatch.has-color {
+  --show-indicator: 0;
+  background-color: var(--swatch-color);
 }
 
 .color-swatch::before {

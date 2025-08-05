@@ -1,135 +1,125 @@
 /**
- * Color space axis enumeration
+ * Represents a single axis in a color space
  */
-export const Axis = {
-  HUE: 'hue',
-  SATURATION: 'saturation',
-  VALUE: 'value'
-};
+export class Axis {
+  /**
+   * @param {string} key - The key name of the axis (e.g., 'hue', 'saturation')
+   * @param {string} unit - The unit for the axis (e.g., '°', '%')
+   * @param {number} max - Maximum value for the axis
+   * @param {number} defaultValue - Default value for the axis
+   */
+  constructor(key, unit, max, defaultValue) {
+    this.key = key;
+    this.unit = unit;
+    this.max = max;
+    this.defaultValue = defaultValue;
+
+    // Min is always 0, name is always the capitalized key
+    this.min = 0;
+    this.name = key.charAt(0).toUpperCase() + key.slice(1);
+
+    Object.freeze(this);
+  }
+}
 
 /**
  * Immutable color space view - a simple container for current axis and value
  */
 export class ColorSpaceView {
-  constructor(currentAxis, currentValue) {
-    this._currentAxis = currentAxis;
-    this._currentValue = currentValue;
+  constructor(colorSpace, currentAxis, currentValue) {
+    this.colorSpace = colorSpace;
+    this.currentAxis = currentAxis;
+    this.currentValue = currentValue;
 
     // Freeze the object to make it immutable
     Object.freeze(this);
   }
-
-  /**
-   * Get the current fixed axis
-   * @returns {string} Current axis
-   */
-  getCurrentAxis() {
-    return this._currentAxis;
-  }
-
-  /**
-   * Get the current axis value
-   * @returns {number} Current value
-   */
-  getCurrentValue() {
-    return this._currentValue;
-  }
 }
 
 /**
- * Immutable HSV color space configuration object
- * Contains all the semantic information about the HSV color space
+ * Immutable color space configuration class
+ * Contains all the semantic information about a color space
  */
-export class HsvColorSpace {
-  constructor() {
-    // Define axis configurations for HSV color space
-    this._axisConfigs = Object.freeze({
-      [Axis.HUE]: {
-        name: 'Hue',
-        unit: '°',
-        min: 0,
-        max: 360,
-        defaultValue: 180,
-        description: 'Color tone'
-      },
-      [Axis.SATURATION]: {
-        name: 'Saturation',
-        unit: '%',
-        min: 0,
-        max: 100,
-        defaultValue: 50,
-        description: 'Color intensity'
-      },
-      [Axis.VALUE]: {
-        name: 'Value',
-        unit: '%',
-        min: 0,
-        max: 100,
-        defaultValue: 75,
-        description: 'Color brightness'
-      }
-    });
+export class ColorSpace {
+  /**
+   * @param {string} type - The type of color space (e.g., 'HSV', 'HSL')
+   * @param {Array<Axis>} axes - Array of Axis objects in order
+   * @param {string} defaultAxisKey - Key of the default axis to select
+   */
+  constructor(type, axes, defaultAxisKey) {
+    this._type = type;
+    this._axes = Object.freeze([...axes]);
+    this._defaultAxis = this.getAxisByKey(defaultAxisKey);
 
-    // Freeze the entire object
+    // Freeze the entire object to make it immutable
     Object.freeze(this);
   }
 
   /**
-   * Get configuration for a specific axis
-   * @param {string} axis - Axis to get config for
-   * @returns {Object} Axis configuration (frozen)
+   * Get an axis by its key name
+   * @param {string} axisKey - The key name of the axis (e.g., 'hue', 'saturation')
+   * @returns {Axis} Axis object
    */
-  getAxisConfig(axis) {
-    if (!this._axisConfigs[axis]) {
-      throw new Error(`Invalid axis: ${axis}`);
-    }
-    return Object.freeze({ ...this._axisConfigs[axis] });
+  getAxisByKey(axisKey) {
+    return this._axes.find(axis => axis.key === axisKey);
   }
 
   /**
-   * Get all axis names
-   * @returns {string[]} Array of axis names
+   * Get the index of an axis object
+   * @param {Axis} axis - The axis object to find the index for
+   * @returns {number} Index of the axis, or -1 if not found
    */
-  getAxisNames() {
-    return Object.keys(this._axisConfigs);
+  getAxisIndex(axis) {
+    return this._axes.indexOf(axis);
   }
 
   /**
-   * Get display name for an axis
-   * @param {string} axis - Axis to get name for
-   * @returns {string} Display name
+   * Get all axes
+   * @returns {Array<Axis>} Array of axis objects
    */
-  getAxisDisplayName(axis) {
-    const config = this.getAxisConfig(axis);
-    return config.name;
+  getAllAxes() {
+    return this._axes;
   }
 
   /**
-   * Get default value for an axis
-   * @param {string} axis - Axis to get default value for
-   * @returns {number} Default value
+   * Get the color space type
+   * @returns {string} Color space type
    */
-  getDefaultValue(axis) {
-    const config = this.getAxisConfig(axis);
-    return config.defaultValue;
+  getType() {
+    return this._type;
   }
 
   /**
-   * Get description for an axis
-   * @param {string} axis - Axis to get description for
-   * @returns {string} Axis description
+   * Get the default axis
+   * @returns {Axis} Default axis object
    */
-  getAxisDescription(axis) {
-    const config = this.getAxisConfig(axis);
-    return config.description;
+  getDefaultAxis() {
+    return this._defaultAxis;
   }
+}
 
-  /**
-   * Check if an axis is valid for this color space
-   * @param {string} axis - Axis to validate
-   * @returns {boolean} True if valid
-   */
-  isValidAxis(axis) {
-    return axis in this._axisConfigs;
-  }
+/**
+ * HSV color space instance
+ */
+export const HsvColorSpace = Object.freeze(new ColorSpace('HSV', [
+  new Axis('hue', '°', 360, 180),
+  new Axis('saturation', '%', 100, 50),
+  new Axis('value', '%', 100, 75)
+], 'saturation'));
+
+/**
+ * HSL color space instance
+ */
+export const HslColorSpace = Object.freeze(new ColorSpace('HSL', [
+  new Axis('hue', '°', 360, 180),
+  new Axis('saturation', '%', 100, 50),
+  new Axis('lightness', '%', 100, 50)
+], 'saturation'));
+
+/**
+ * Get all available color spaces in canonical order
+ * @returns {Array<ColorSpace>} Array of all color space instances
+ */
+export function getAllColorSpaces() {
+  return [HsvColorSpace, HslColorSpace];
 }

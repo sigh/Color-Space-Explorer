@@ -1,34 +1,39 @@
 precision mediump float;
 varying vec2 v_texCoord;
 uniform float u_fixedValue;
-uniform float u_axisMode; // 0.0=hue, 1.0=saturation, 2.0=value
+uniform int u_colorSpaceIndex; // 0=HSV, 1=HSL
+uniform int u_axisIndex; // Ordered as the color-space initials.
 
 vec3 hsvToRgb(float h, float s, float v) {
   vec3 k = vec3(1.0, 2.0/3.0, 1.0/3.0);
-  vec3 p = abs(fract(h/360.0 + k) * 6.0 - 3.0);
+  vec3 p = abs(fract(h + k) * 6.0 - 3.0);
   return v * mix(k.xxx, clamp(p - k.xxx, 0.0, 1.0), s);
 }
 
-void main() {
-  float h, s, v;
+vec3 hslToRgb(float h, float s, float l) {
+  float c = (1.0 - abs(2.0 * l - 1.0)) * s;
+  vec3 k = vec3(1.0, 2.0/3.0, 1.0/3.0);
+  vec3 p = abs(fract(h + k) * 6.0 - 3.0);
+  return l + c * (clamp(p - 1.0, 0.0, 1.0) - 0.5);
+}
 
-  if (u_axisMode < 0.5) {
-    // Fixed hue: x=saturation, y=value
-    h = u_fixedValue;
-    s = v_texCoord.x;
-    v = v_texCoord.y;
-  } else if (u_axisMode < 1.5) {
-    // Fixed saturation: x=hue, y=value
-    h = v_texCoord.x * 360.0;
-    s = u_fixedValue / 100.0;
-    v = v_texCoord.y;
+void main() {
+  vec3 colorCoord;
+
+  if (u_axisIndex == 0) {
+    colorCoord = vec3(u_fixedValue, v_texCoord.x, v_texCoord.y);
+  } else if (u_axisIndex == 1) {
+    colorCoord = vec3(v_texCoord.x, u_fixedValue, v_texCoord.y);
   } else {
-    // Fixed value: x=hue, y=saturation
-    h = v_texCoord.x * 360.0;
-    s = v_texCoord.y;
-    v = u_fixedValue / 100.0;
+    colorCoord = vec3(v_texCoord.x, v_texCoord.y, u_fixedValue);
   }
 
-  vec3 color = hsvToRgb(h, s, v);
+  vec3 color;
+  if (u_colorSpaceIndex == 0) {
+    color = hsvToRgb(colorCoord.x, colorCoord.y, colorCoord.z);
+  } else {
+    color = hslToRgb(colorCoord.x, colorCoord.y, colorCoord.z);
+  }
+
   gl_FragColor = vec4(color, 1.0);
 }

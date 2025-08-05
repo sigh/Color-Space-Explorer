@@ -1,6 +1,6 @@
-import { rgbToHsl, rgbToHsv, rgbToBytes } from './colorUtils.js';
-import { clearElement, createTextNode, toIntPercentage } from './utils.js';
-import { ColorSpaceView } from './colorSpace.js';
+import { rgbToHsl, rgbToHsv } from './colorUtils.js';
+import { clearElement, createTextNode, toIntPercentage, createElement } from './utils.js';
+import { ColorSpaceView, getAllColorSpaces } from './colorSpace.js';
 
 /**
  * UI controller for updating color information display and handling axis controls
@@ -17,10 +17,12 @@ export class UIController {
     this.axisSlider = document.getElementById('axisSlider');
     this.axisValue = document.getElementById('axisValue');
     this.axisLabel = document.getElementById('axisLabel');
-    this.axisButtons = document.querySelectorAll('.axis-button');
 
-    // Callback for when color space changes
-    this.onColorSpaceChange = null;
+    // Color spaces
+    this.colorSpaces = getAllColorSpaces();
+
+    // Callback
+    this.onColorSpaceChange = (colorSpaceView) => { }
   }
 
   /**
@@ -33,56 +35,149 @@ export class UIController {
 
   /**
    * Initialize axis controls
-   * @param {HsvColorSpace} hsvColorSpace - HSV color space configuration
    * @param {ColorSpaceView} initialColorSpaceView - Initial color space view
    */
-  setupAxisControls(hsvColorSpace, initialColorSpaceView) {
+  setupAxisControls(initialColorSpaceView) {
     // Store references
-    this.hsvColorSpace = hsvColorSpace;
-    let currentAxis = initialColorSpaceView.getCurrentAxis();
+    this.colorSpace = initialColorSpaceView.colorSpace;
+    this.currentAxis = initialColorSpaceView.currentAxis;
 
-    // Set up axis selection buttons
-    this.axisButtons.forEach(button => {
-      button.addEventListener('click', () => {
-        currentAxis = button.dataset.axis;
-        this.selectAxis(button.dataset.axis);
-      });
-    });
+    // Initialize color space buttons
+    this.setupColorSpaceButtons();
+
+    // Initialize axis buttons for the current color space
+    this.updateAxisButtons();
 
     // Set up slider
     this.axisSlider.addEventListener('input', (event) => {
       const value = parseInt(event.target.value);
-      const colorSpaceView = new ColorSpaceView(currentAxis, value);
+      const colorSpaceView = new ColorSpaceView(this.colorSpace, this.currentAxis, value);
       this.updateAxisDisplay(colorSpaceView);
-      if (this.onColorSpaceChange) {
-        this.onColorSpaceChange(colorSpaceView);
-      }
+      this.onColorSpaceChange(colorSpaceView);
     });
 
     // Initialize display
     this.updateAxisDisplay(initialColorSpaceView);
+
+    // Notify change
+    this.onColorSpaceChange(initialColorSpaceView);
   }
 
   /**
-   * Select a new axis
-   * @param {string} axis - Axis to select
+   * Update the color space buttons based on available color spaces
    */
-  selectAxis(axis) {
-    // Update active button
-    this.axisButtons.forEach(btn => btn.classList.remove('active'));
-    document.querySelector(`[data-axis="${axis}"]`).classList.add('active');
+  setupColorSpaceButtons() {
+    const colorSpaceSelector = document.querySelector('.color-space-selector');
+    clearElement(colorSpaceSelector); // Clear existing buttons
+
+    this.colorSpaces.forEach((colorSpace, index) => {
+      const label = createElement('label');
+      label.className = 'radio-button';
+
+      const radio = createElement('input');
+      radio.type = 'radio';
+      radio.name = 'color-space';
+      radio.value = colorSpace.getType();
+
+      // Make the first button checked by default
+      if (index === 0) {
+        radio.checked = true;
+      }
+
+      const span = createElement('span', colorSpace.getType());
+
+      label.appendChild(radio);
+      label.appendChild(span);
+      colorSpaceSelector.appendChild(label);
+
+      // Attach event listener directly
+      radio.addEventListener('change', () => {
+        this.selectColorSpace(radio.value);
+      });
+    });
+  }
+
+  /**
+ * Update the axis buttons based on the current color space
+ */
+  updateAxisButtons() {
+    const axisSelector = document.querySelector('.axis-selector');
+    clearElement(axisSelector); // Clear existing buttons
+
+    const axes = this.colorSpace.getAllAxes();
+    const defaultAxis = this.colorSpace.getDefaultAxis();
+
+    axes.forEach((axis) => {
+      const label = createElement('label');
+      label.className = 'radio-button';
+
+      const radio = createElement('input');
+      radio.type = 'radio';
+      radio.name = 'axis';
+      radio.value = axis.key;
+
+      // Make the default axis checked by default
+      if (axis === defaultAxis) {
+        radio.checked = true;
+      }
+
+      const span = createElement('span', axis.name);
+
+      label.appendChild(radio);
+      label.appendChild(span);
+      axisSelector.appendChild(label);
+
+      // Attach event listener directly
+      radio.addEventListener('change', () => {
+        this.selectAxisByKey(radio.value);
+      });
+    });
+  }
+
+  /**
+   * Select a new color space type
+   * @param {string} colorSpaceType - Color space type to select (HSV or HSL)
+   */
+  selectColorSpace(colorSpaceType) {
+    // Update color space
+    this.colorSpace = this.colorSpaces.find(cs => cs.getType() === colorSpaceType);
+
+    // Update axis buttons for the new color space
+    this.updateAxisButtons();
+
+    // Reset to default axis
+    const defaultAxis = this.colorSpace.getDefaultAxis();
+    this.currentAxis = defaultAxis;
+
+    // Create new color space view with default axis
+    const colorSpaceView = new ColorSpaceView(
+      this.colorSpace,
+      defaultAxis,
+      defaultAxis.defaultValue
+    );
+    // Update display
+    this.updateAxisDisplay(colorSpaceView);
+
+    // Notify change
+    this.onColorSpaceChange(colorSpaceView);
+  }
+
+  /**
+   * Select a specific axis by key
+   * @param {string} axisKey - Key of axis to select
+   */
+  selectAxisByKey(axisKey) {
+    const axis = this.colorSpace.getAxisByKey(axisKey);
+    this.currentAxis = axis;
 
     // Create color space view with new axis and its default value
-    const defaultValue = this.hsvColorSpace.getDefaultValue(axis);
-    const colorSpaceView = new ColorSpaceView(axis, defaultValue);
+    const colorSpaceView = new ColorSpaceView(this.colorSpace, axis, axis.defaultValue);
 
     // Update display
     this.updateAxisDisplay(colorSpaceView);
 
     // Notify change
-    if (this.onColorSpaceChange) {
-      this.onColorSpaceChange(colorSpaceView);
-    }
+    this.onColorSpaceChange(colorSpaceView);
   }
 
   /**
@@ -90,33 +185,34 @@ export class UIController {
    * @param {ColorSpaceView} colorSpaceView - Color space view to display
    */
   updateAxisDisplay(colorSpaceView) {
-    const config = this.hsvColorSpace.getAxisConfig(colorSpaceView.getCurrentAxis());
+    const axis = colorSpaceView.currentAxis;
 
     // Update slider
-    this.axisSlider.min = config.min;
-    this.axisSlider.max = config.max;
-    this.axisSlider.value = colorSpaceView.getCurrentValue();
+    this.axisSlider.min = axis.min;
+    this.axisSlider.max = axis.max;
+    this.axisSlider.value = colorSpaceView.currentValue;
 
     // Update labels
-    this.axisLabel.textContent = config.name;
-    this.axisValue.textContent = `${colorSpaceView.getCurrentValue()}${config.unit}`;
+    this.axisLabel.textContent = axis.name;
+    this.axisValue.textContent = `${colorSpaceView.currentValue}${axis.unit}`;
   }
 
   /**
    * Update the hovered color display
-   * @param {Object} rgb - RGB color {r, g, b} (0-1 values)
+   * @param {Object} rgbBytes - RGB color {r, g, b} (0-255 values)
    */
-  updateHoveredColor(rgb) {
-    // Convert to bytes for CSS
-    const rgbBytes = rgbToBytes(rgb.r, rgb.g, rgb.b);
-
+  updateHoveredColor(rgbBytes) {
     // Update color swatch
-    this.colorSwatch.style.backgroundColor = `rgb(${rgbBytes.r}, ${rgbBytes.g}, ${rgbBytes.b})`;
-
-    // Hide the indicator dot when showing color
-    this.colorSwatch.style.setProperty('--show-indicator', '0');
+    this.colorSwatch.style.setProperty(
+      '--swatch-color', `rgb(${rgbBytes.r}, ${rgbBytes.g}, ${rgbBytes.b})`);
+    this.colorSwatch.classList.add('has-color');
 
     // Convert to other color spaces
+    const rgb = {
+      r: rgbBytes.r / 255,
+      g: rgbBytes.g / 255,
+      b: rgbBytes.b / 255
+    };
     const hsl = rgbToHsl(rgb.r, rgb.g, rgb.b);
     const hsv = rgbToHsv(rgb.r, rgb.g, rgb.b);
 
@@ -136,11 +232,7 @@ export class UIController {
    */
   clearHoveredColor() {
     // Reset color swatch to empty state
-    this.colorSwatch.style.backgroundColor = 'transparent';
-    this.colorSwatch.style.opacity = '1';
-
-    // Show the indicator dot when no color
-    this.colorSwatch.style.setProperty('--show-indicator', '0.5');
+    this.colorSwatch.classList.remove('has-color');
 
     // Clear color values with placeholder dashes
     clearElement(this.rgbData);

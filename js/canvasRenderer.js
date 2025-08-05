@@ -1,4 +1,4 @@
-import { Axis } from './colorSpace.js';
+import { getAllColorSpaces } from "./colorSpace.js";
 
 /**
  * WebGL Canvas renderer for color spaces
@@ -48,7 +48,8 @@ export class CanvasRenderer {
     this.positionLocation = this.gl.getAttribLocation(this.program, 'a_position');
     this.texCoordLocation = this.gl.getAttribLocation(this.program, 'a_texCoord');
     this.fixedValueLocation = this.gl.getUniformLocation(this.program, 'u_fixedValue');
-    this.axisModeLocation = this.gl.getUniformLocation(this.program, 'u_axisMode');
+    this.axisIndexLocation = this.gl.getUniformLocation(this.program, 'u_axisIndex');
+    this.colorSpaceIndexLocation = this.gl.getUniformLocation(this.program, 'u_colorSpaceIndex');
 
     // Create buffers, set up vertex attributes, and set viewport
     this.setupBuffersAndAttributes();
@@ -118,39 +119,33 @@ export class CanvasRenderer {
   }
 
   /**
-   * Render HSV color space with fixed axis using WebGL
+   * Render color space with fixed axis using WebGL
    * @param {ColorSpaceView} colorSpaceView - Immutable color space view
    */
-  renderHsvSpace(colorSpaceView) {
+  renderColorSpace(colorSpaceView) {
     this.gl.useProgram(this.program);
 
-    const currentAxis = colorSpaceView.getCurrentAxis();
-    const fixedValue = colorSpaceView.getCurrentValue();
+    const colorSpace = colorSpaceView.colorSpace;
+    const currentAxisIndex = colorSpace.getAxisIndex(
+      colorSpaceView.currentAxis);
 
-    // Set axis mode: 0.0=hue, 1.0=saturation, 2.0=value
-    let axisMode;
-    switch (currentAxis) {
-      case Axis.HUE:
-        axisMode = 0.0;
-        break;
-      case Axis.SATURATION:
-        axisMode = 1.0;
-        break;
-      case Axis.VALUE:
-        axisMode = 2.0;
-        break;
-      default:
-        throw new Error(`Unknown axis: ${currentAxis}`);
-    }
+    // Normalize the fixed value to 0-1 range
+    const axis = colorSpaceView.currentAxis;
+    const normalizedFixedValue = colorSpaceView.currentValue / axis.max;
 
-    this.gl.uniform1f(this.axisModeLocation, axisMode);
-    this.gl.uniform1f(this.fixedValueLocation, fixedValue);
+    const colorSpaceIndex = getAllColorSpaces().indexOf(colorSpace);
+
+    this.gl.uniform1i(this.axisIndexLocation, currentAxisIndex);
+    this.gl.uniform1f(this.fixedValueLocation, normalizedFixedValue);
+    this.gl.uniform1i(this.colorSpaceIndexLocation, colorSpaceIndex);
     this.gl.drawArrays(this.gl.TRIANGLE_STRIP, 0, 4);
-  }  /**
+  }
+
+  /**
    * Get color at canvas coordinates by reading from the canvas
    * @param {number} x - X coordinate
    * @param {number} y - Y coordinate
-   * @returns {Object} RGB color {r, g, b} (0-1 values)
+   * @returns {Object} RGB bytes color {r, g, b} (0-255 values)
    */
   getColorAt(x, y) {
     const gl = this.gl;
@@ -166,11 +161,10 @@ export class CanvasRenderer {
     const pixels = new Uint8Array(4);
     gl.readPixels(x, glY, 1, 1, gl.RGBA, gl.UNSIGNED_BYTE, pixels);
 
-    // Convert from 0-255 to 0-1
     return {
-      r: pixels[0] / 255,
-      g: pixels[1] / 255,
-      b: pixels[2] / 255
+      r: pixels[0],
+      g: pixels[1],
+      b: pixels[2],
     };
   }
 }

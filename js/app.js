@@ -1,6 +1,6 @@
 import { CanvasRenderer } from './canvasRenderer.js';
 import { UIController } from './uiController.js';
-import { ColorSpaceView, HsvColorSpace, Axis } from './colorSpace.js';
+import { ColorSpaceView, getAllColorSpaces } from './colorSpace.js';
 
 /**
  * Main application class
@@ -9,7 +9,6 @@ class ColorSpaceExplorer {
   constructor() {
     this.canvas = document.getElementById('colorCanvas');
     this.uiController = new UIController();
-    this.hsvColorSpace = new HsvColorSpace();
   }
 
   async init() {
@@ -21,13 +20,16 @@ class ColorSpaceExplorer {
       this.updateRenderer(newColorSpaceView);
     });
 
-    // Create initial color space view with default hue axis
+    // Set up the initial color space
+    const colorSpaces = getAllColorSpaces();
+    const initialColorSpace = colorSpaces.find(cs => cs.getType() === 'HSV');
+    const defaultAxis = initialColorSpace.getDefaultAxis();
     const initialColorSpaceView = new ColorSpaceView(
-      Axis.HUE,
-      this.hsvColorSpace.getDefaultValue(Axis.HUE)
+      initialColorSpace,
+      defaultAxis,
+      defaultAxis.defaultValue
     );
-    this.uiController.setupAxisControls(this.hsvColorSpace, initialColorSpaceView);
-    this.updateRenderer(initialColorSpaceView);
+    this.uiController.setupAxisControls(initialColorSpaceView);
 
     // Set up mouse handlers
     this.setupMouseHandlers();
@@ -37,7 +39,7 @@ class ColorSpaceExplorer {
   }
 
   updateRenderer(colorSpaceView) {
-    this.renderer.renderHsvSpace(colorSpaceView);
+    this.renderer.renderColorSpace(colorSpaceView);
   }
 
   setupMouseHandlers() {
@@ -47,11 +49,10 @@ class ColorSpaceExplorer {
       const x = event.clientX - rect.left;
       const y = event.clientY - rect.top;
 
-      // Get color at mouse position
-      const color = this.renderer.getColorAt(x, y);
+      const rgbBytes = this.renderer.getColorAt(x, y);
 
       // Update UI
-      this.uiController.updateHoveredColor(color);
+      this.uiController.updateHoveredColor(rgbBytes);
     });
 
     // Mouse leave handler to reset to default
