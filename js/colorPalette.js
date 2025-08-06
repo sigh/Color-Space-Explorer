@@ -4,6 +4,50 @@ import { PaletteColor } from './paletteColor.js';
 import { getPresetNames, getPreset } from './colorPresets.js';
 
 /**
+ * Create a color item element styled like palette colors
+ * @param {PaletteColor|null} color - The color to create an item for, or null for empty state
+ * @returns {HTMLElement} The color item element
+ */
+export function createColorItem(color) {
+  const item = createElement('div');
+  item.className = 'color-item';
+
+  // Color swatch
+  const swatch = createElement('div');
+  swatch.className = 'color-swatch';
+  item.appendChild(swatch);
+
+  if (!color) {
+    return item;
+  }
+
+  // Valid color state
+
+  swatch.classList.add('has-color');
+  const rgbBytes = rgbToBytes(color.rgb.r, color.rgb.g, color.rgb.b);
+  swatch.style.backgroundColor = `rgb(${rgbBytes.r}, ${rgbBytes.g}, ${rgbBytes.b})`;
+
+  // Color info container
+  const info = createElement('div');
+  info.className = 'color-item-info';
+
+  const name = createElement('div');
+  name.className = 'color-name';
+  name.appendChild(createTextNode(color ? color.name : 'No Palette'));
+
+  const rgbValues = createElement('div');
+  rgbValues.className = 'color-values';
+  rgbValues.appendChild(createTextNode(`RGB: ${toIntPercentage(color.rgb.r)}%, ${toIntPercentage(color.rgb.g)}%, ${toIntPercentage(color.rgb.b)}%`));
+
+  info.appendChild(name);
+  info.appendChild(rgbValues);
+
+  item.appendChild(info);
+
+  return item;
+}
+
+/**
  * Manages the color palette display and functionality
  */
 export class ColorPalette {
@@ -67,45 +111,9 @@ export class ColorPalette {
 
     // Render each color
     this._colors.forEach((color, index) => {
-      const colorItem = this._createColorItem(color, index);
+      const colorItem = createColorItem(color);
       this._colorList.appendChild(colorItem);
     });
-  }
-
-  /**
-   * Create a single color item element
-   * @param {PaletteColor} color - The color to create an item for
-   * @returns {HTMLElement} The color item element
-   */
-  _createColorItem(color) {
-    const item = createElement('div');
-    item.className = 'color-item';
-
-    // Color swatch - smaller for compact layout
-    const swatch = createElement('div');
-    swatch.className = 'color-swatch has-color';
-    const rgbBytes = rgbToBytes(color.rgb.r, color.rgb.g, color.rgb.b);
-    swatch.style.backgroundColor = `rgb(${rgbBytes.r}, ${rgbBytes.g}, ${rgbBytes.b})`;
-
-    // Color info container for vertical layout
-    const info = createElement('div');
-    info.className = 'color-item-info';
-
-    const name = createElement('div');
-    name.className = 'color-name';
-    name.appendChild(createTextNode(color.name));
-
-    const rgbValues = createElement('div');
-    rgbValues.className = 'color-values';
-    rgbValues.appendChild(createTextNode(`RGB: ${toIntPercentage(color.rgb.r)}%, ${toIntPercentage(color.rgb.g)}%, ${toIntPercentage(color.rgb.b)}%`));
-
-    info.appendChild(name);
-    info.appendChild(rgbValues);
-
-    item.appendChild(swatch);
-    item.appendChild(info);
-
-    return item;
   }
 
   /**

@@ -14,6 +14,7 @@ export class CanvasRenderer {
 
     this._width = canvas.width;
     this._height = canvas.height;
+    this._paletteColors = []; // The palette colors used for indexing.
 
     this._initWebGL(vertexShaderSource, computeFragmentShaderSource, renderFragmentShaderSource);
   }
@@ -54,6 +55,8 @@ export class CanvasRenderer {
       fixedValueLocation: gl.getUniformLocation(computeProgram, 'u_fixedValue'),
       axisIndexLocation: gl.getUniformLocation(computeProgram, 'u_axisIndex'),
       colorSpaceIndexLocation: gl.getUniformLocation(computeProgram, 'u_colorSpaceIndex'),
+      paletteColorsLocation: gl.getUniformLocation(computeProgram, 'u_paletteColors'),
+      paletteCountLocation: gl.getUniformLocation(computeProgram, 'u_paletteCount'),
     };
 
     // Create and configure render program
@@ -162,12 +165,16 @@ export class CanvasRenderer {
   }
 
   /**
-   * Render color space with fixed axis using two-phase WebGL rendering
+   * Render a color space view with palette colors
    * @param {ColorSpaceView} colorSpaceView - Immutable color space view
+   * @param {Array<PaletteColor>} paletteColors - Array of palette colors to find closest matches for
    */
-  renderColorSpace(colorSpaceView) {
-    // Compute phase: Render color space to framebuffer
-    this._computePhase(colorSpaceView);
+  renderColorSpace(colorSpaceView, paletteColors = []) {
+    // Store palette colors for consistency with indices
+    this._paletteColors = [...paletteColors];
+
+    // Compute phase: Render color space computation with closest palette index to framebuffer
+    this._computePhase(colorSpaceView, paletteColors);
 
     // Render phase: Render framebuffer texture to canvas
     this._renderPhase();
@@ -176,8 +183,9 @@ export class CanvasRenderer {
   /**
    * Compute phase: Render color space computation to framebuffer
    * @param {ColorSpaceView} colorSpaceView - Immutable color space view
+   * @param {Array<PaletteColor>} paletteColors - Array of palette colors to find closest matches for
    */
-  _computePhase(colorSpaceView) {
+  _computePhase(colorSpaceView, paletteColors) {
     const gl = this._gl;
 
     // Bind framebuffer
@@ -192,6 +200,21 @@ export class CanvasRenderer {
     gl.uniform1i(this._compute.axisIndexLocation, colorSpaceView.colorSpace.getAxisIndex(colorSpaceView.currentAxis));
     gl.uniform1f(this._compute.fixedValueLocation, colorSpaceView.currentValue / colorSpaceView.currentAxis.max);
     gl.uniform1i(this._compute.colorSpaceIndexLocation, getAllColorSpaces().indexOf(colorSpaceView.colorSpace));
+
+    // Set palette colors uniforms
+    const maxPaletteColors = 200; // Allow up to 200 palette colors
+    const actualCount = Math.min(paletteColors.length, maxPaletteColors);
+    gl.uniform1i(this._compute.paletteCountLocation, actualCount);
+
+    // Convert palette colors to flat array of RGB values
+    const paletteData = new Float32Array(maxPaletteColors * 3);
+    for (let i = 0; i < actualCount; i++) {
+      const color = paletteColors[i];
+      paletteData[i * 3] = color.rgb.r;
+      paletteData[i * 3 + 1] = color.rgb.g;
+      paletteData[i * 3 + 2] = color.rgb.b;
+    }
+    gl.uniform3fv(this._compute.paletteColorsLocation, paletteData);
 
     // Draw
     gl.drawArrays(gl.TRIANGLE_STRIP, 0, 4);
@@ -224,7 +247,7 @@ export class CanvasRenderer {
    * Get color at canvas coordinates by reading from the framebuffer
    * @param {number} x - X coordinate
    * @param {number} y - Y coordinate
-   * @returns {Object} RGB bytes color {r, g, b} (0-255 values)
+   * @returns {Array} Tuple [{r, g, b}, closestColor] where RGB values are 0-255 and closestColor is a PaletteColor object or null
    */
   getColorAt(x, y) {
     const gl = this._gl;
@@ -246,10 +269,15 @@ export class CanvasRenderer {
     // Restore default framebuffer
     gl.bindFramebuffer(gl.FRAMEBUFFER, null);
 
-    return {
-      r: pixels[0],
-      g: pixels[1],
-      b: pixels[2],
-    };
+    // Look up the closest palette color using the index from alpha channel
+    const paletteIndex = pixels[3];
+    const closestColor = (paletteIndex < this._paletteColors.length)
+      ? this._paletteColors[paletteIndex]
+      : null;
+
+    return [
+      { r: pixels[0], g: pixels[1], b: pixels[2] }, // RGB color object
+      closestColor // Actual PaletteColor object or null
+    ];
   }
 }

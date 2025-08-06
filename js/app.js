@@ -38,11 +38,12 @@ class ColorSpaceExplorer {
     this._setupMouseHandlers();
 
     // Set default UI state
-    this._uiController.setDefaultColor();
+    this._uiController.clearColors();
   }
 
   _updateRenderer(colorSpaceView) {
-    this._renderer.renderColorSpace(colorSpaceView);
+    const paletteColors = this._colorPalette.getColors();
+    this._renderer.renderColorSpace(colorSpaceView, paletteColors);
   }
 
   _setupMouseHandlers() {
@@ -52,15 +53,16 @@ class ColorSpaceExplorer {
       const x = event.clientX - rect.left;
       const y = event.clientY - rect.top;
 
-      const rgbBytes = this._renderer.getColorAt(x, y);
+      const [rgbColor, closestColor] = this._renderer.getColorAt(x, y);
 
-      // Update UI
-      this._uiController.updateHoveredColor(rgbBytes);
+      // Update UI with separate method calls
+      this._uiController.updateHoveredColor(rgbColor);
+      this._uiController.updateClosestColor(closestColor);
     });
 
     // Mouse leave handler to reset to default
     this._canvas.addEventListener('mouseleave', () => {
-      this._uiController.setDefaultColor();
+      this._uiController.clearColors();
     });
   }
 }

@@ -1,6 +1,7 @@
-import { rgbToHsl, rgbToHsv } from './colorUtils.js';
+import { rgbToHsl, rgbToHsv, rgbToBytes } from './colorUtils.js';
 import { clearElement, createTextNode, toIntPercentage, createElement } from './utils.js';
 import { ColorSpaceView, getAllColorSpaces } from './colorSpace.js';
+import { createColorItem } from './colorPalette.js';
 
 /**
  * UI controller for updating color information display and handling axis controls
@@ -13,6 +14,9 @@ export class UIController {
     this._hslData = document.querySelector('.hsl-data');
     this._hsvData = document.querySelector('.hsv-data');
 
+    // Closest color display element
+    this._closestColorContainer = document.getElementById('closestColorContainer');
+
     // Axis control elements
     this._axisSlider = document.getElementById('axisSlider');
     this._axisValue = document.getElementById('axisValue');
@@ -20,6 +24,9 @@ export class UIController {
 
     // Color spaces
     this._colorSpaces = getAllColorSpaces();
+
+    // Current palette colors for closest color lookup
+    this._paletteColors = [];
 
     // Callback
     this._onColorSpaceChange = (colorSpaceView) => { }
@@ -31,6 +38,14 @@ export class UIController {
    */
   setColorSpaceChangeCallback(callback) {
     this._onColorSpaceChange = callback;
+  }
+
+  /**
+   * Set the current palette colors for closest color lookup
+   * @param {Array<PaletteColor>} paletteColors - Array of palette colors
+   */
+  setPaletteColors(paletteColors) {
+    this._paletteColors = paletteColors;
   }
 
   /**
@@ -228,27 +243,30 @@ export class UIController {
   }
 
   /**
-   * Clear color display when not hovering
+   * Update the closest color display
+   * @param {PaletteColor|null} closestColor - The closest palette color or null if no palette
    */
-  _clearHoveredColor() {
+  updateClosestColor(closestColor) {
+    // Always clear and rebuild the container content
+    clearElement(this._closestColorContainer);
+
+    // Create a color item using the shared utility (handles null gracefully)
+    const colorItem = createColorItem(closestColor);
+    this._closestColorContainer.appendChild(colorItem);
+  }
+
+  /**
+   * Clear color displays when not hovering
+   */
+  clearColors() {
     // Reset color swatch to empty state
     this._colorSwatch.classList.remove('has-color');
 
     // Clear color values with placeholder dashes
     clearElement(this._rgbData);
-    this._rgbData.appendChild(createTextNode('—'));
-
     clearElement(this._hslData);
-    this._hslData.appendChild(createTextNode('—'));
-
     clearElement(this._hsvData);
-    this._hsvData.appendChild(createTextNode('—'));
-  }
 
-  /**
-   * Set default color display
-   */
-  setDefaultColor() {
-    this._clearHoveredColor();
+    this.updateClosestColor(null);
   }
 }
