@@ -8,19 +8,19 @@ import { ColorPalette } from './colorPalette.js';
  */
 class ColorSpaceExplorer {
   constructor() {
-    this.canvas = document.getElementById('colorCanvas');
-    this.uiController = new UIController();
+    this._canvas = document.getElementById('colorCanvas');
+    this._uiController = new UIController();
     const paletteContainer = document.querySelector('.palette-panel');
-    this.colorPalette = new ColorPalette(paletteContainer);
+    this._colorPalette = new ColorPalette(paletteContainer);
   }
 
   async init() {
     // Create renderer with async factory
-    this.renderer = await CanvasRenderer.create(this.canvas);
+    this._renderer = await CanvasRenderer.create(this._canvas);
 
     // Set up UI controller with callback
-    this.uiController.setColorSpaceChangeCallback((newColorSpaceView) => {
-      this.updateRenderer(newColorSpaceView);
+    this._uiController.setColorSpaceChangeCallback((newColorSpaceView) => {
+      this._updateRenderer(newColorSpaceView);
     });
 
     // Set up the initial color space
@@ -32,35 +32,35 @@ class ColorSpaceExplorer {
       defaultAxis,
       defaultAxis.defaultValue
     );
-    this.uiController.setupAxisControls(initialColorSpaceView);
+    this._uiController.setupAxisControls(initialColorSpaceView);
 
     // Set up mouse handlers
-    this.setupMouseHandlers();
+    this._setupMouseHandlers();
 
     // Set default UI state
-    this.uiController.setDefaultColor();
+    this._uiController.setDefaultColor();
   }
 
-  updateRenderer(colorSpaceView) {
-    this.renderer.renderColorSpace(colorSpaceView);
+  _updateRenderer(colorSpaceView) {
+    this._renderer.renderColorSpace(colorSpaceView);
   }
 
-  setupMouseHandlers() {
+  _setupMouseHandlers() {
     // Mouse move handler for hover effect
-    this.canvas.addEventListener('mousemove', (event) => {
-      const rect = this.canvas.getBoundingClientRect();
+    this._canvas.addEventListener('mousemove', (event) => {
+      const rect = this._canvas.getBoundingClientRect();
       const x = event.clientX - rect.left;
       const y = event.clientY - rect.top;
 
-      const rgbBytes = this.renderer.getColorAt(x, y);
+      const rgbBytes = this._renderer.getColorAt(x, y);
 
       // Update UI
-      this.uiController.updateHoveredColor(rgbBytes);
+      this._uiController.updateHoveredColor(rgbBytes);
     });
 
     // Mouse leave handler to reset to default
-    this.canvas.addEventListener('mouseleave', () => {
-      this.uiController.setDefaultColor();
+    this._canvas.addEventListener('mouseleave', () => {
+      this._uiController.setDefaultColor();
     });
   }
 }

@@ -8,17 +8,17 @@ import { getPresetNames, getPreset } from './colorPresets.js';
  */
 export class ColorPalette {
   constructor(container) {
-    this.colors = [];
+    this._colors = [];
     this.container = container;
-    this.colorList = null;
-    this.dropdown = null;
-    this.initializeUI();
+    this._colorList = null;
+    this._dropdown = null;
+    this._initializeUI();
   }
 
   /**
    * Initialize the palette UI structure and controls
    */
-  initializeUI() {
+  _initializeUI() {
     // Clear existing content
     clearElement(this.container);
 
@@ -29,7 +29,7 @@ export class ColorPalette {
     // Create preset dropdown
     const dropdown = createElement('select');
     dropdown.className = 'palette-dropdown';
-    this.dropdown = dropdown;
+    this._dropdown = dropdown;
 
     // Add preset options
     getPresetNames().forEach(presetName => {
@@ -40,35 +40,35 @@ export class ColorPalette {
 
     // Add change event listener
     dropdown.addEventListener('change', (event) => {
-      this.colors = [...getPreset(event.target.value)];
-      this.renderColors();
+      this._colors = [...getPreset(event.target.value)];
+      this._renderColors();
     });
 
     this.container.appendChild(dropdown);
 
     // Create scrollable color list container
-    this.colorList = createElement('div');
-    this.colorList.className = 'color-list';
-    this.container.appendChild(this.colorList);
+    this._colorList = createElement('div');
+    this._colorList.className = 'color-list';
+    this.container.appendChild(this._colorList);
 
-    this.colors = [...getPreset(dropdown.value)];
-    this.renderColors();
+    this._colors = [...getPreset(dropdown.value)];
+    this._renderColors();
   }
 
   /**
    * Render the color list
    */
-  renderColors() {
-    if (!this.colorList) {
+  _renderColors() {
+    if (!this._colorList) {
       return;
     }
 
-    clearElement(this.colorList);
+    clearElement(this._colorList);
 
     // Render each color
-    this.colors.forEach((color, index) => {
-      const colorItem = this.createColorItem(color, index);
-      this.colorList.appendChild(colorItem);
+    this._colors.forEach((color, index) => {
+      const colorItem = this._createColorItem(color, index);
+      this._colorList.appendChild(colorItem);
     });
   }
 
@@ -77,7 +77,7 @@ export class ColorPalette {
    * @param {PaletteColor} color - The color to create an item for
    * @returns {HTMLElement} The color item element
    */
-  createColorItem(color) {
+  _createColorItem(color) {
     const item = createElement('div');
     item.className = 'color-item';
 
@@ -115,8 +115,8 @@ export class ColorPalette {
    */
   addColor(name, rgb) {
     const newColor = new PaletteColor(name, rgb);
-    this.colors.push(newColor);
-    this.renderColors();
+    this._colors.push(newColor);
+    this._renderColors();
   }
 
   /**
@@ -124,6 +124,6 @@ export class ColorPalette {
    * @returns {Array<PaletteColor>} Array of palette colors
    */
   getColors() {
-    return [...this.colors];
+    return [...this._colors];
   }
 }
