@@ -1,6 +1,7 @@
 import { CanvasRenderer } from './canvasRenderer.js';
 import { UIController } from './uiController.js';
 import { ColorSpaceView, getAllColorSpaces } from './colorSpace.js';
+import { ColorPalette } from './colorPalette.js';
 
 /**
  * Main application class
@@ -9,6 +10,8 @@ class ColorSpaceExplorer {
   constructor() {
     this.canvas = document.getElementById('colorCanvas');
     this.uiController = new UIController();
+    const paletteContainer = document.querySelector('.palette-panel');
+    this.colorPalette = new ColorPalette(paletteContainer);
   }
 
   async init() {

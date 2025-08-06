@@ -20,20 +20,35 @@ body {
   background: #374151;
 }
 
+/* Panels */
 .control-panel,
-.canvas-panel,
 .palette-panel {
+  padding: 20px;
   background: #1f2937;
   overflow-y: auto;
+  display: flex;
+  flex-direction: column;
 }
 
-/* Left Panel */
 .control-panel {
-  padding: 20px;
   border-right: 1px solid #374151;
 }
 
-.control-section h3 {
+.palette-panel {
+  border-left: 1px solid #374151;
+  overflow-y: hidden;
+}
+
+.canvas-panel {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  padding: 40px;
+  background: #111827;
+}
+
+.control-section h3,
+.palette-panel h3 {
   color: #d1d5db;
   font-size: 14px;
   font-weight: 500;
@@ -197,15 +212,6 @@ body {
   color: #d1d5db;
 }
 
-/* Center Panel */
-.canvas-panel {
-  display: flex;
-  flex-direction: column;
-  align-items: center;
-  padding: 40px;
-  background: #111827;
-}
-
 .app-title {
   color: #f9fafb;
   font-size: 28px;
@@ -218,19 +224,71 @@ body {
   cursor: crosshair;
 }
 
-/* Right Panel */
-.palette-panel {
-  padding: 20px;
-  border-left: 1px solid #374151;
+.color-list {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  overflow-y: auto;
+  flex: 1;
 }
 
-.palette-panel h2 {
-  color: #f9fafb;
-  font-size: 20px;
-  font-weight: 600;
-  margin-bottom: 24px;
-  padding-bottom: 8px;
-  border-bottom: 1px solid #374151;
+.palette-dropdown {
+  background: #374151;
+  border: 1px solid #4b5563;
+  border-radius: 6px;
+  color: #d1d5db;
+  font-size: 12px;
+  padding: 8px 12px;
+  margin-bottom: 16px;
+  cursor: pointer;
+  outline: none;
+  transition: border-color 0.2s ease;
+}
+
+.palette-dropdown:hover {
+  border-color: #6b7280;
+}
+
+.palette-dropdown:focus {
+  border-color: #6366f1;
+}
+
+.color-item {
+  display: flex;
+  align-items: flex-start;
+  gap: 12px;
+  padding: 8px;
+  background: #374151;
+  border-radius: 6px;
+  transition: background-color 0.2s ease;
+}
+
+.color-item:hover {
+  background: #4b5563;
+}
+
+.color-item .color-swatch {
+  width: 32px;
+  height: 32px;
+  flex-shrink: 0;
+}
+
+.color-item-info {
+  flex: 1;
+  min-width: 0;
+}
+
+.color-item .color-name {
+  color: #d1d5db;
+  font-size: 12px;
+  font-weight: 500;
+  margin-bottom: 2px;
+}
+
+.color-item .color-values {
+  color: #9ca3af;
+  font-family: 'Monaco', monospace;
+  font-size: 11px;
 }
 
 .placeholder-text {
