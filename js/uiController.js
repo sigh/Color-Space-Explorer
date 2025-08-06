@@ -22,10 +22,16 @@ export class UIController {
     this._axisValue = document.getElementById('axisValue');
     this._axisLabel = document.getElementById('axisLabel');
 
+    // Boundaries toggle element
+    this._boundariesToggle = document.getElementById('boundariesToggle');
+
     // Callback
     this._onColorSpaceChange = onColorSpaceChange;
 
     // Initialize the UI with the provided color space view
+    this._boundariesToggle.addEventListener('change', () => {
+      this._triggerUpdate();
+    });
     this._setupAxisControls(initialColorSpaceView);
 
     // Set default UI state
@@ -50,7 +56,7 @@ export class UIController {
     // Set up slider
     this._axisSlider.addEventListener('input', (event) => {
       const value = parseInt(event.target.value);
-      const colorSpaceView = new ColorSpaceView(this._colorSpace, this._currentAxis, value);
+      const colorSpaceView = new ColorSpaceView(this._colorSpace, this._currentAxis, value, this._boundariesToggle.checked);
       this._updateAxisDisplay(colorSpaceView);
       this._onColorSpaceChange(colorSpaceView);
     });
@@ -153,7 +159,8 @@ export class UIController {
     const colorSpaceView = new ColorSpaceView(
       this._colorSpace,
       defaultAxis,
-      defaultAxis.defaultValue
+      defaultAxis.defaultValue,
+      this._boundariesToggle.checked
     );
     // Update display
     this._updateAxisDisplay(colorSpaceView);
@@ -171,7 +178,7 @@ export class UIController {
     this._currentAxis = axis;
 
     // Create color space view with new axis and its default value
-    const colorSpaceView = new ColorSpaceView(this._colorSpace, axis, axis.defaultValue);
+    const colorSpaceView = new ColorSpaceView(this._colorSpace, axis, axis.defaultValue, this._boundariesToggle.checked);
 
     // Update display
     this._updateAxisDisplay(colorSpaceView);
@@ -253,5 +260,18 @@ export class UIController {
     clearElement(this._hsvData);
 
     this.updateClosestColor(null);
+  }
+
+  /**
+   * Trigger an update to re-render with current settings
+   */
+  _triggerUpdate() {
+    const currentColorSpaceView = new ColorSpaceView(
+      this._colorSpace,
+      this._currentAxis,
+      parseInt(this._axisSlider.value),
+      this._boundariesToggle.checked
+    );
+    this._onColorSpaceChange(currentColorSpaceView);
   }
 }

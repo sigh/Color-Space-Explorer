@@ -66,6 +66,8 @@ export class CanvasRenderer {
       positionLocation: gl.getAttribLocation(renderProgram, 'a_position'),
       texCoordLocation: gl.getAttribLocation(renderProgram, 'a_texCoord'),
       colorTextureLocation: gl.getUniformLocation(renderProgram, 'u_colorTexture'),
+      textureSizeLocation: gl.getUniformLocation(renderProgram, 'u_textureSize'),
+      showBoundariesLocation: gl.getUniformLocation(renderProgram, 'u_showBoundaries'),
     };
 
     // Create framebuffer, texture, and vertex buffer
@@ -177,7 +179,7 @@ export class CanvasRenderer {
     this._computePhase(colorSpaceView, paletteColors);
 
     // Render phase: Render framebuffer texture to canvas
-    this._renderPhase();
+    this._renderPhase(colorSpaceView.showBoundaries);
   }
 
   /**
@@ -222,8 +224,9 @@ export class CanvasRenderer {
 
   /**
    * Render phase: Render framebuffer texture to canvas
+   * @param {boolean} showBoundaries - Whether to show region boundaries
    */
-  _renderPhase() {
+  _renderPhase(showBoundaries = true) {
     const gl = this._gl;
 
     // Bind default framebuffer (canvas)
@@ -238,6 +241,12 @@ export class CanvasRenderer {
     gl.activeTexture(gl.TEXTURE0);
     gl.bindTexture(gl.TEXTURE_2D, this._colorTexture);
     gl.uniform1i(this._render.colorTextureLocation, 0);
+
+    // Set texture size uniform
+    gl.uniform2f(this._render.textureSizeLocation, this._width, this._height);
+
+    // Set boundaries visibility uniform
+    gl.uniform1i(this._render.showBoundariesLocation, showBoundaries ? 1 : 0);
 
     // Draw
     gl.drawArrays(gl.TRIANGLE_STRIP, 0, 4);

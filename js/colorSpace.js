@@ -26,10 +26,11 @@ export class Axis {
  * Immutable color space view - a simple container for current axis and value
  */
 export class ColorSpaceView {
-  constructor(colorSpace, currentAxis, currentValue) {
+  constructor(colorSpace, currentAxis, currentValue, showBoundaries = true) {
     this.colorSpace = colorSpace;
     this.currentAxis = currentAxis;
     this.currentValue = currentValue;
+    this.showBoundaries = showBoundaries;
 
     // Freeze the object to make it immutable
     Object.freeze(this);

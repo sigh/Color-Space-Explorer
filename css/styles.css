@@ -150,6 +150,73 @@ body {
   text-align: right;
 }
 
+/* Toggle Checkbox */
+.toggle-checkbox {
+  display: none;
+}
+
+.control-label:has(.toggle-checkbox) {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  cursor: pointer;
+  margin-bottom: 0;
+  padding: 8px 0;
+  position: relative;
+}
+
+.control-label:has(.toggle-checkbox):hover .toggle-label {
+  color: #d1d5db;
+}
+
+.toggle-label {
+  color: #9ca3af;
+  font-size: 12px;
+  font-weight: 500;
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+  transition: color 0.2s ease;
+}
+
+.control-label:has(.toggle-checkbox)::before {
+  content: '';
+  width: 40px;
+  height: 20px;
+  background: #374151;
+  border: 1px solid #4b5563;
+  border-radius: 12px;
+  position: relative;
+  transition: all 0.2s ease;
+  flex-shrink: 0;
+}
+
+.control-label:has(.toggle-checkbox)::after {
+  content: '';
+  width: 16px;
+  height: 16px;
+  background: #9ca3af;
+  border-radius: 50%;
+  position: absolute;
+  top: 50%;
+  left: 2px;
+  transform: translateY(-50%);
+  transition: all 0.2s ease;
+}
+
+.control-label:has(.toggle-checkbox:checked)::before {
+  background: #6366f1;
+  border-color: #6366f1;
+}
+
+.control-label:has(.toggle-checkbox:checked)::after {
+  left: 22px;
+  background: #ffffff;
+}
+
+.control-label:has(.toggle-checkbox:checked) .toggle-label {
+  color: #ffffff;
+}
+
 .color-info {
   display: flex;
   align-items: center;
