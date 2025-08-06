@@ -9,36 +9,29 @@ import { ColorPalette } from './colorPalette.js';
 class ColorSpaceExplorer {
   constructor() {
     this._canvas = document.getElementById('colorCanvas');
-    this._uiController = new UIController();
     const paletteContainer = document.querySelector('.palette-panel');
     this._colorPalette = new ColorPalette(paletteContainer);
   }
 
   async init() {
-    // Create renderer with async factory
     this._renderer = await CanvasRenderer.create(this._canvas);
 
-    // Set up UI controller with callback
-    this._uiController.setColorSpaceChangeCallback((newColorSpaceView) => {
-      this._updateRenderer(newColorSpaceView);
-    });
+    const initialColorSpaceView = this._makeInitialColorSpaceView();
 
-    // Set up the initial color space
-    const colorSpaces = getAllColorSpaces();
-    const initialColorSpace = colorSpaces.find(cs => cs.getType() === 'HSV');
+    this._uiController = new UIController(
+      initialColorSpaceView, this._updateRenderer.bind(this));
+
+    this._setupMouseHandlers();
+  }
+
+  _makeInitialColorSpaceView() {
+    const initialColorSpace = getAllColorSpaces()[0];
     const defaultAxis = initialColorSpace.getDefaultAxis();
-    const initialColorSpaceView = new ColorSpaceView(
+    return new ColorSpaceView(
       initialColorSpace,
       defaultAxis,
       defaultAxis.defaultValue
     );
-    this._uiController.setupAxisControls(initialColorSpaceView);
-
-    // Set up mouse handlers
-    this._setupMouseHandlers();
-
-    // Set default UI state
-    this._uiController.clearColors();
   }
 
   _updateRenderer(colorSpaceView) {

@@ -99,6 +99,15 @@ export class ColorSpace {
 }
 
 /**
+ * RGB color space instance
+ */
+export const RgbColorSpace = Object.freeze(new ColorSpace('RGB', [
+  new Axis('red', '%', 100, 50),
+  new Axis('green', '%', 100, 50),
+  new Axis('blue', '%', 100, 50)
+], 'red'));
+
+/**
  * HSV color space instance
  */
 export const HsvColorSpace = Object.freeze(new ColorSpace('HSV', [
@@ -121,5 +130,14 @@ export const HslColorSpace = Object.freeze(new ColorSpace('HSL', [
  * @returns {Array<ColorSpace>} Array of all color space instances
  */
 export function getAllColorSpaces() {
-  return [HsvColorSpace, HslColorSpace];
+  return [RgbColorSpace, HsvColorSpace, HslColorSpace];
+}
+
+/**
+ * Get a color space by type
+ * @param {string} type - The type of color space (e.g., 'HSV', 'HSL')
+ * @returns {ColorSpace} Color space instance
+ */
+export function getColorSpaceByType(type) {
+  return getAllColorSpaces().find(cs => cs.getType() === type);
 }

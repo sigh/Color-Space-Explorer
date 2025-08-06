@@ -1,7 +1,7 @@
 precision mediump float;
 varying vec2 v_texCoord;
 uniform float u_fixedValue;
-uniform int u_colorSpaceIndex; // 0=HSV, 1=HSL
+uniform int u_colorSpaceIndex; // 0=RGB, 1=HSV, 2=HSL
 uniform int u_axisIndex; // Ordered as the color-space initials.
 
 const int MAX_PALETTE_COLORS = 200;
@@ -56,8 +56,13 @@ void main() {
 
   vec3 color;
   if (u_colorSpaceIndex == 0) {
+    // RGB color space - colorCoord values are already in RGB range [0,1]
+    color = colorCoord;
+  } else if (u_colorSpaceIndex == 1) {
+    // HSV color space
     color = hsvToRgb(colorCoord.x, colorCoord.y, colorCoord.z);
   } else {
+    // HSL color space
     color = hslToRgb(colorCoord.x, colorCoord.y, colorCoord.z);
   }
 

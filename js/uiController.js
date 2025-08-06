@@ -1,13 +1,13 @@
-import { rgbToHsl, rgbToHsv, rgbToBytes } from './colorUtils.js';
+import { rgbToHsl, rgbToHsv } from './colorUtils.js';
 import { clearElement, createTextNode, toIntPercentage, createElement } from './utils.js';
-import { ColorSpaceView, getAllColorSpaces } from './colorSpace.js';
+import { ColorSpaceView, getAllColorSpaces, getColorSpaceByType } from './colorSpace.js';
 import { createColorItem } from './colorPalette.js';
 
 /**
  * UI controller for updating color information display and handling axis controls
  */
 export class UIController {
-  constructor() {
+  constructor(initialColorSpaceView, onColorSpaceChange) {
     // Color display elements
     this._colorSwatch = document.querySelector('.color-swatch');
     this._rgbData = document.querySelector('.rgb-data');
@@ -22,43 +22,27 @@ export class UIController {
     this._axisValue = document.getElementById('axisValue');
     this._axisLabel = document.getElementById('axisLabel');
 
-    // Color spaces
-    this._colorSpaces = getAllColorSpaces();
-
-    // Current palette colors for closest color lookup
-    this._paletteColors = [];
-
     // Callback
-    this._onColorSpaceChange = (colorSpaceView) => { }
-  }
+    this._onColorSpaceChange = onColorSpaceChange;
 
-  /**
-   * Set callback for color space changes
-   * @param {Function} callback - Function to call when color space changes
-   */
-  setColorSpaceChangeCallback(callback) {
-    this._onColorSpaceChange = callback;
-  }
+    // Initialize the UI with the provided color space view
+    this._setupAxisControls(initialColorSpaceView);
 
-  /**
-   * Set the current palette colors for closest color lookup
-   * @param {Array<PaletteColor>} paletteColors - Array of palette colors
-   */
-  setPaletteColors(paletteColors) {
-    this._paletteColors = paletteColors;
+    // Set default UI state
+    this.clearColors();
   }
 
   /**
    * Initialize axis controls
    * @param {ColorSpaceView} initialColorSpaceView - Initial color space view
    */
-  setupAxisControls(initialColorSpaceView) {
+  _setupAxisControls(initialColorSpaceView) {
     // Store references
     this._colorSpace = initialColorSpaceView.colorSpace;
     this._currentAxis = initialColorSpaceView.currentAxis;
 
     // Initialize color space buttons
-    this._setupColorSpaceButtons();
+    this._setupColorSpaceButtons(this._colorSpace);
 
     // Initialize axis buttons for the current color space
     this._updateAxisButtons();
@@ -80,26 +64,27 @@ export class UIController {
 
   /**
    * Update the color space buttons based on available color spaces
+   * @param {ColorSpace} colorSpace - The currently selected color space
    */
-  _setupColorSpaceButtons() {
+  _setupColorSpaceButtons(colorSpace) {
     const colorSpaceSelector = document.querySelector('.color-space-selector');
-    clearElement(colorSpaceSelector); // Clear existing buttons
+    clearElement(colorSpaceSelector);
 
-    this._colorSpaces.forEach((colorSpace, index) => {
+    getAllColorSpaces().forEach((cs) => {
       const label = createElement('label');
       label.className = 'radio-button';
 
       const radio = createElement('input');
       radio.type = 'radio';
       radio.name = 'color-space';
-      radio.value = colorSpace.getType();
+      radio.value = cs.getType();
 
-      // Make the first button checked by default
-      if (index === 0) {
+      // Make the selected color space checked
+      if (cs === colorSpace) {
         radio.checked = true;
       }
 
-      const span = createElement('span', colorSpace.getType());
+      const span = createElement('span', cs.getType());
 
       label.appendChild(radio);
       label.appendChild(span);
@@ -155,7 +140,7 @@ export class UIController {
    */
   _selectColorSpace(colorSpaceType) {
     // Update color space
-    this._colorSpace = this._colorSpaces.find(cs => cs.getType() === colorSpaceType);
+    this._colorSpace = getColorSpaceByType(colorSpaceType);
 
     // Update axis buttons for the new color space
     this._updateAxisButtons();
