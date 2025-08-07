@@ -11,7 +11,7 @@
 <body>
   <div class="app-container">
     <!-- Left Panel - Controls -->
-    <aside class="control-panel">
+    <div class="control-panel">
       <section class="control-section">
         <h3>Color Space</h3>
         <div class="control-group">
@@ -42,34 +42,36 @@
         </div>
       </section>
 
-      <section class="control-section">
-        <h3>Hovered Color</h3>
-        <div class="color-info">
-          <div class="color-swatch"></div>
-          <div class="color-values">
-            <div class="color-value">
-              <span class="color-label">RGB:</span>
-              <span class="color-data rgb-data">—</span>
-            </div>
-            <div class="color-value">
-              <span class="color-label">HSL:</span>
-              <span class="color-data hsl-data">—</span>
-            </div>
-            <div class="color-value">
-              <span class="color-label">HSV:</span>
-              <span class="color-data hsv-data">—</span>
+      <section class="color-display-section">
+        <div class="control-section">
+          <h3>Hovered Color</h3>
+          <div class="color-info">
+            <div class="color-swatch"></div>
+            <div class="color-values">
+              <div class="color-value">
+                <span class="color-label">RGB:</span>
+                <span class="color-data rgb-data">—</span>
+              </div>
+              <div class="color-value">
+                <span class="color-label">HSL:</span>
+                <span class="color-data hsl-data">—</span>
+              </div>
+              <div class="color-value">
+                <span class="color-label">HSV:</span>
+                <span class="color-data hsv-data">—</span>
+              </div>
             </div>
           </div>
         </div>
-      </section>
 
-      <section class="control-section">
-        <h3>Closest Color</h3>
-        <div id="closestColorContainer" class="closest-color-container">
-          <div class="placeholder-text">Move mouse over canvas</div>
+        <div class="control-section">
+          <h3>Closest Color</h3>
+          <div class="closest-color-container">
+            <div class="placeholder-text">Move mouse over canvas</div>
+          </div>
         </div>
       </section>
-    </aside>
+    </div>
 
     <!-- Center Panel - Canvas -->
     <main class="canvas-panel">
@@ -78,8 +80,8 @@
     </main>
 
     <!-- Right Panel - Palette -->
-    <aside class="palette-panel">
-    </aside>
+    <div class="palette-panel">
+    </div>
   </div>
 
   <script type="module" src="js/app.js"></script>

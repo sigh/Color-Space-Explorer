@@ -1,22 +1,11 @@
-import { rgbToHsl, rgbToHsv } from './colorUtils.js';
-import { clearElement, createTextNode, toIntPercentage, createElement } from './utils.js';
+import { clearElement, createElement } from './utils.js';
 import { ColorSpaceView, getAllColorSpaces, getColorSpaceByType } from './colorSpace.js';
-import { createColorItem } from './colorPalette.js';
 
 /**
- * UI controller for updating color information display and handling axis controls
+ * UI controller for handling axis controls and boundaries toggle
  */
 export class UIController {
   constructor(initialColorSpaceView, onColorSpaceChange) {
-    // Color display elements
-    this._colorSwatch = document.querySelector('.color-swatch');
-    this._rgbData = document.querySelector('.rgb-data');
-    this._hslData = document.querySelector('.hsl-data');
-    this._hsvData = document.querySelector('.hsv-data');
-
-    // Closest color display element
-    this._closestColorContainer = document.getElementById('closestColorContainer');
-
     // Axis control elements
     this._axisSlider = document.getElementById('axisSlider');
     this._axisValue = document.getElementById('axisValue');
@@ -33,9 +22,6 @@ export class UIController {
       this._triggerUpdate();
     });
     this._setupAxisControls(initialColorSpaceView);
-
-    // Set default UI state
-    this.clearColors();
   }
 
   /**
@@ -202,64 +188,6 @@ export class UIController {
     // Update labels
     this._axisLabel.textContent = axis.name;
     this._axisValue.textContent = `${colorSpaceView.currentValue}${axis.unit}`;
-  }
-
-  /**
-   * Update the hovered color display
-   * @param {Object} rgbBytes - RGB color {r, g, b} (0-255 values)
-   */
-  updateHoveredColor(rgbBytes) {
-    // Update color swatch
-    this._colorSwatch.style.setProperty(
-      '--swatch-color', `rgb(${rgbBytes.r}, ${rgbBytes.g}, ${rgbBytes.b})`);
-    this._colorSwatch.classList.add('has-color');
-
-    // Convert to other color spaces
-    const rgb = {
-      r: rgbBytes.r / 255,
-      g: rgbBytes.g / 255,
-      b: rgbBytes.b / 255
-    };
-    const hsl = rgbToHsl(rgb.r, rgb.g, rgb.b);
-    const hsv = rgbToHsv(rgb.r, rgb.g, rgb.b);
-
-    // Update color values using DOM methods (format for display)
-    clearElement(this._rgbData);
-    this._rgbData.appendChild(createTextNode(`${toIntPercentage(rgb.r)}%, ${toIntPercentage(rgb.g)}%, ${toIntPercentage(rgb.b)}%`));
-
-    clearElement(this._hslData);
-    this._hslData.appendChild(createTextNode(`${Math.round(hsl.h)}°, ${toIntPercentage(hsl.s)}%, ${toIntPercentage(hsl.l)}%`));
-
-    clearElement(this._hsvData);
-    this._hsvData.appendChild(createTextNode(`${Math.round(hsv.h)}°, ${toIntPercentage(hsv.s)}%, ${toIntPercentage(hsv.v)}%`));
-  }
-
-  /**
-   * Update the closest color display
-   * @param {PaletteColor|null} closestColor - The closest palette color or null if no palette
-   */
-  updateClosestColor(closestColor) {
-    // Always clear and rebuild the container content
-    clearElement(this._closestColorContainer);
-
-    // Create a color item using the shared utility (handles null gracefully)
-    const colorItem = createColorItem(closestColor);
-    this._closestColorContainer.appendChild(colorItem);
-  }
-
-  /**
-   * Clear color displays when not hovering
-   */
-  clearColors() {
-    // Reset color swatch to empty state
-    this._colorSwatch.classList.remove('has-color');
-
-    // Clear color values with placeholder dashes
-    clearElement(this._rgbData);
-    clearElement(this._hslData);
-    clearElement(this._hsvData);
-
-    this.updateClosestColor(null);
   }
 
   /**

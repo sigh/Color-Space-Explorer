@@ -2,6 +2,7 @@ import { CanvasRenderer } from './canvasRenderer.js';
 import { UIController } from './uiController.js';
 import { ColorSpaceView, getAllColorSpaces } from './colorSpace.js';
 import { ColorPalette } from './colorPalette.js';
+import { ColorDisplay } from './colorDisplay.js';
 
 /**
  * Main application class
@@ -11,6 +12,9 @@ class ColorSpaceExplorer {
     this._canvas = document.getElementById('colorCanvas');
     const paletteContainer = document.querySelector('.palette-panel');
     this._colorPalette = new ColorPalette(paletteContainer);
+
+    const colorDisplayContainer = document.querySelector('.color-display-section');
+    this._colorDisplay = new ColorDisplay(colorDisplayContainer);
   }
 
   async init() {
@@ -48,14 +52,14 @@ class ColorSpaceExplorer {
 
       const [rgbColor, closestColor] = this._renderer.getColorAt(x, y);
 
-      // Update UI with separate method calls
-      this._uiController.updateHoveredColor(rgbColor);
-      this._uiController.updateClosestColor(closestColor);
+      // Update color display
+      this._colorDisplay.updateHoveredColor(rgbColor);
+      this._colorDisplay.updateClosestColor(closestColor);
     });
 
     // Mouse leave handler to reset to default
     this._canvas.addEventListener('mouseleave', () => {
-      this._uiController.clearColors();
+      this._colorDisplay.clear();
     });
   }
 }
