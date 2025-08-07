@@ -1,15 +1,15 @@
 import { getAllColorSpaces } from "./colorSpace.js";
 
 /**
- * WebGL Canvas renderer for color spaces with framebuffer rendering
+ * WebGL2 Canvas renderer for color spaces with framebuffer rendering
  */
 export class CanvasRenderer {
   constructor(canvas, vertexShaderSource, computeFragmentShaderSource, renderFragmentShaderSource) {
     this.canvas = canvas;
-    this._gl = canvas.getContext('webgl', { preserveDrawingBuffer: true });
+    this._gl = canvas.getContext('webgl2', { preserveDrawingBuffer: true });
 
     if (!this._gl) {
-      throw new Error('WebGL not supported');
+      throw new Error('WebGL2 not supported');
     }
 
     this._width = canvas.width;
@@ -64,9 +64,7 @@ export class CanvasRenderer {
     this._render = {
       program: renderProgram,
       positionLocation: gl.getAttribLocation(renderProgram, 'a_position'),
-      texCoordLocation: gl.getAttribLocation(renderProgram, 'a_texCoord'),
       colorTextureLocation: gl.getUniformLocation(renderProgram, 'u_colorTexture'),
-      textureSizeLocation: gl.getUniformLocation(renderProgram, 'u_textureSize'),
       showBoundariesLocation: gl.getUniformLocation(renderProgram, 'u_showBoundaries'),
     };
 
@@ -154,16 +152,19 @@ export class CanvasRenderer {
   /**
    * Set up vertex attributes for a specific program
    * @param {number} positionLocation - Position attribute location
-   * @param {number} texCoordLocation - Texture coordinate attribute location
+   * @param {number|null} texCoordLocation - Texture coordinate attribute location
    */
-  _setupVertexAttributes(positionLocation, texCoordLocation) {
+  _setupVertexAttributes(positionLocation, texCoordLocation = null) {
     const gl = this._gl;
 
     gl.bindBuffer(gl.ARRAY_BUFFER, this._quadBuffer);
     gl.enableVertexAttribArray(positionLocation);
     gl.vertexAttribPointer(positionLocation, 2, gl.FLOAT, false, 16, 0);
-    gl.enableVertexAttribArray(texCoordLocation);
-    gl.vertexAttribPointer(texCoordLocation, 2, gl.FLOAT, false, 16, 8);
+
+    if (texCoordLocation !== null) {
+      gl.enableVertexAttribArray(texCoordLocation);
+      gl.vertexAttribPointer(texCoordLocation, 2, gl.FLOAT, false, 16, 8);
+    }
   }
 
   /**
@@ -235,15 +236,12 @@ export class CanvasRenderer {
 
     // Use render program
     gl.useProgram(this._render.program);
-    this._setupVertexAttributes(this._render.positionLocation, this._render.texCoordLocation);
+    this._setupVertexAttributes(this._render.positionLocation);
 
     // Bind and set the compute texture
     gl.activeTexture(gl.TEXTURE0);
     gl.bindTexture(gl.TEXTURE_2D, this._colorTexture);
     gl.uniform1i(this._render.colorTextureLocation, 0);
-
-    // Set texture size uniform
-    gl.uniform2f(this._render.textureSizeLocation, this._width, this._height);
 
     // Set boundaries visibility uniform
     gl.uniform1i(this._render.showBoundariesLocation, showBoundaries ? 1 : 0);

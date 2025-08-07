@@ -1,5 +1,7 @@
+#version 300 es
 precision mediump float;
-varying vec2 v_texCoord;
+in vec2 v_texCoord;
+out vec4 fragColor;
 uniform float u_fixedValue;
 uniform int u_colorSpaceIndex; // 0=RGB, 1=HSV, 2=HSL
 uniform int u_axisIndex; // Ordered as the color-space initials.
@@ -70,5 +72,5 @@ void main() {
   int closestIndex = findClosestPaletteIndex(color);
   float alpha = float(closestIndex) / 255.0;
 
-  gl_FragColor = vec4(color, alpha);
+  fragColor = vec4(color, alpha);
 }
