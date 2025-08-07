@@ -1,11 +1,10 @@
-import { rgbToBytes } from './colorUtils.js';
-import { clearElement, createElement, createTextNode, toIntPercentage } from './utils.js';
-import { PaletteColor } from './paletteColor.js';
-import { getPresetNames, getPreset } from './colorPresets.js';
+import { rgbToCssString } from './colorUtils.js';
+import { clearElement, createElement, createTextNode } from './utils.js';
+import { NamedColor, getPresetNames, getPreset } from './namedColor.js';
 
 /**
  * Create a color item element styled like palette colors
- * @param {PaletteColor|null} color - The color to create an item for, or null for empty state
+ * @param {NamedColor|null} color - The color to create an item for, or null for empty state
  * @returns {HTMLElement} The color item element
  */
 export function createColorItem(color) {
@@ -24,8 +23,8 @@ export function createColorItem(color) {
   // Valid color state
 
   swatch.classList.add('has-color');
-  const rgbBytes = rgbToBytes(color.rgb.r, color.rgb.g, color.rgb.b);
-  swatch.style.backgroundColor = `rgb(${rgbBytes.r}, ${rgbBytes.g}, ${rgbBytes.b})`;
+  const cssColor = rgbToCssString(color.rgbColor);
+  swatch.style.backgroundColor = cssColor;
 
   // Color info container
   const info = createElement('div');
@@ -37,7 +36,7 @@ export function createColorItem(color) {
 
   const rgbValues = createElement('div');
   rgbValues.className = 'color-values';
-  rgbValues.appendChild(createTextNode(`RGB: ${toIntPercentage(color.rgb.r)}%, ${toIntPercentage(color.rgb.g)}%, ${toIntPercentage(color.rgb.b)}%`));
+  rgbValues.appendChild(createTextNode(color.rgbColor.toString()));
 
   info.appendChild(name);
   info.appendChild(rgbValues);
@@ -110,26 +109,26 @@ export class ColorPalette {
     clearElement(this._colorList);
 
     // Render each color
-    this._colors.forEach((color, index) => {
+    for (const color of this._colors) {
       const colorItem = createColorItem(color);
       this._colorList.appendChild(colorItem);
-    });
+    }
   }
 
   /**
    * Add a new color to the palette
    * @param {string} name - The name of the color
-   * @param {Object} rgb - RGB color {r, g, b} (0-1 values)
+   * @param {RgbColor} color - RGB color instance
    */
-  addColor(name, rgb) {
-    const newColor = new PaletteColor(name, rgb);
+  addColor(name, color) {
+    const newColor = new NamedColor(name, color);
     this._colors.push(newColor);
     this._renderColors();
   }
 
   /**
    * Get all colors in the palette
-   * @returns {Array<PaletteColor>} Array of palette colors
+   * @returns {Array<NamedColor>} Array of palette colors
    */
   getColors() {
     return [...this._colors];

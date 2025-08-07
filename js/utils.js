@@ -34,12 +34,3 @@ export function createElement(tagName, textContent = '') {
   }
   return element;
 }
-
-/**
- * Convert a 0-1 value to integer percentage
- * @param {number} value - Value between 0 and 1
- * @returns {number} Integer percentage (0-100)
- */
-export function toIntPercentage(value) {
-  return Math.round(value * 100);
-}

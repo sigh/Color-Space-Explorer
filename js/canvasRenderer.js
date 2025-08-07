@@ -1,4 +1,4 @@
-import { getAllColorSpaces } from "./colorSpace.js";
+import { getAllColorSpaces, RgbColor } from "./colorSpace.js";
 
 /**
  * WebGL2 Canvas renderer for color spaces with framebuffer rendering
@@ -170,7 +170,7 @@ export class CanvasRenderer {
   /**
    * Render a color space view with palette colors
    * @param {ColorSpaceView} colorSpaceView - Immutable color space view
-   * @param {Array<PaletteColor>} paletteColors - Array of palette colors to find closest matches for
+   * @param {Array<NamedColor>} paletteColors - Array of palette colors to find closest matches for
    */
   renderColorSpace(colorSpaceView, paletteColors = []) {
     // Store palette colors for consistency with indices
@@ -186,7 +186,7 @@ export class CanvasRenderer {
   /**
    * Compute phase: Render color space computation to framebuffer
    * @param {ColorSpaceView} colorSpaceView - Immutable color space view
-   * @param {Array<PaletteColor>} paletteColors - Array of palette colors to find closest matches for
+   * @param {Array<NamedColor>} paletteColors - Array of palette colors to find closest matches for
    */
   _computePhase(colorSpaceView, paletteColors) {
     const gl = this._gl;
@@ -212,10 +212,11 @@ export class CanvasRenderer {
     // Convert palette colors to flat array of RGB values
     const paletteData = new Float32Array(maxPaletteColors * 3);
     for (let i = 0; i < actualCount; i++) {
-      const color = paletteColors[i];
-      paletteData[i * 3] = color.rgb.r;
-      paletteData[i * 3 + 1] = color.rgb.g;
-      paletteData[i * 3 + 2] = color.rgb.b;
+      const paletteColor = paletteColors[i];
+      const [r, g, b] = paletteColor.rgbColor;
+      paletteData[i * 3] = r;
+      paletteData[i * 3 + 1] = g;
+      paletteData[i * 3 + 2] = b;
     }
     gl.uniform3fv(this._compute.paletteColorsLocation, paletteData);
 
@@ -254,7 +255,7 @@ export class CanvasRenderer {
    * Get color at canvas coordinates by reading from the framebuffer
    * @param {number} x - X coordinate
    * @param {number} y - Y coordinate
-   * @returns {Array} Tuple [{r, g, b}, closestColor] where RGB values are 0-255 and closestColor is a PaletteColor object or null
+   * @returns {Array} Tuple [RgbColor, closestColor] where RgbColor is normalized (0-1) and closestColor is a NamedColor object or null
    */
   getColorAt(x, y) {
     const gl = this._gl;
@@ -282,9 +283,16 @@ export class CanvasRenderer {
       ? this._paletteColors[paletteIndex]
       : null;
 
+    // Convert pixels to normalized RgbColor
+    const rgbColor = new RgbColor(
+      pixels[0] / 255,
+      pixels[1] / 255,
+      pixels[2] / 255
+    );
+
     return [
-      { r: pixels[0], g: pixels[1], b: pixels[2] }, // RGB color object
-      closestColor // Actual PaletteColor object or null
+      rgbColor, // RgbColor instance with normalized coordinates
+      closestColor // Actual NamedColor object or null
     ];
   }
 }

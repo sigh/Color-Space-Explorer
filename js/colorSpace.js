@@ -142,3 +142,87 @@ export function getAllColorSpaces() {
 export function getColorSpaceByType(type) {
   return getAllColorSpaces().find(cs => cs.getType() === type);
 }
+
+/**
+ * Base color class - not exported
+ */
+class Color {
+  /**
+   * @param {...number} coordinates - The coordinate values for each axis in the color space (normalized to 0-1 range)
+   * @throws {Error} If the number of coordinates doesn't match the number of axes
+   */
+  constructor(...coordinates) {
+    const colorSpace = this.constructor.colorSpace;
+    const expectedAxes = colorSpace.getAllAxes().length;
+    if (coordinates.length !== expectedAxes) {
+      throw new Error(
+        `Color requires ${expectedAxes} coordinates for ${colorSpace.getType()} color space, got ${coordinates.length}`
+      );
+    }
+
+    // Validate that all coordinates are in the normalized [0, 1] range
+    coordinates.forEach((coord, i) => {
+      if (coord < 0 || coord > 1) {
+        const axisName = colorSpace.getAllAxes()[i].name;
+        throw new Error(
+          `Coordinate for ${axisName} must be in range [0, 1], got ${coord}`
+        );
+      }
+    });
+
+    this._coordinates = coordinates;
+    Object.freeze(this);
+  }
+
+  /**
+   * Get the color space this color belongs to
+   * @returns {ColorSpace} The color space instance
+   */
+  getColorSpace() {
+    return this.constructor.colorSpace;
+  }
+
+  /**
+   * Make the color iterable over its coordinates
+   * @returns {Iterator<number>} Iterator over coordinate values
+   */
+  *[Symbol.iterator]() {
+    yield* this._coordinates;
+  }
+
+  /**
+   * Returns a string representation of the color in its color space.
+   * Example: "RGB: 100% 0% 50%"
+   * @returns {string}
+   */
+  toString() {
+    const colorSpace = this.constructor.colorSpace;
+    const type = colorSpace.getType();
+    const axes = colorSpace.getAllAxes();
+    const coords = this._coordinates
+      .map((c, i) => `${Math.round(c * axes[i].max)}${axes[i].unit}`)
+      .join(' ');
+    return `${type}: ${coords}`;
+  }
+}
+
+/**
+ * RGB color with normalized coordinates (0-1 range)
+ */
+export class RgbColor extends Color {
+  static colorSpace = RgbColorSpace;
+}
+
+/**
+ * HSV color with normalized coordinates (0-1 range)
+ */
+export class HsvColor extends Color {
+  static colorSpace = HsvColorSpace;
+}
+
+/**
+ * HSL color with normalized coordinates (0-1 range)
+ */
+export class HslColor extends Color {
+  static colorSpace = HslColorSpace;
+}

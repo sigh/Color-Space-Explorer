@@ -1,5 +1,5 @@
-import { rgbToHsl, rgbToHsv } from './colorUtils.js';
-import { clearElement, createTextNode, toIntPercentage } from './utils.js';
+import { rgbToHsl, rgbToHsv, rgbToCssString } from './colorUtils.js';
+import { clearElement, createTextNode } from './utils.js';
 import { createColorItem } from './colorPalette.js';
 
 /**
@@ -24,37 +24,34 @@ export class ColorDisplay {
 
   /**
    * Update the hovered color display
-   * @param {Object} rgbBytes - RGB color {r, g, b} (0-255 values)
+   * @param {RgbColor} rgbColor - RGB color instance with normalized coordinates
    */
-  updateHoveredColor(rgbBytes) {
+  updateHoveredColor(rgbColor) {
+    // Convert to CSS string for display
+    const cssColor = rgbToCssString(rgbColor);
+
     // Update color swatch
-    this._colorSwatch.style.setProperty(
-      '--swatch-color', `rgb(${rgbBytes.r}, ${rgbBytes.g}, ${rgbBytes.b})`);
+    this._colorSwatch.style.setProperty('--swatch-color', cssColor);
     this._colorSwatch.classList.add('has-color');
 
     // Convert to other color spaces
-    const rgb = {
-      r: rgbBytes.r / 255,
-      g: rgbBytes.g / 255,
-      b: rgbBytes.b / 255
-    };
-    const hsl = rgbToHsl(rgb.r, rgb.g, rgb.b);
-    const hsv = rgbToHsv(rgb.r, rgb.g, rgb.b);
+    const hslColor = rgbToHsl(rgbColor);
+    const hsvColor = rgbToHsv(rgbColor);
 
     // Update color values using DOM methods (format for display)
     clearElement(this._rgbData);
-    this._rgbData.appendChild(createTextNode(`${toIntPercentage(rgb.r)}%, ${toIntPercentage(rgb.g)}%, ${toIntPercentage(rgb.b)}%`));
+    this._rgbData.appendChild(createTextNode(rgbColor.toString()));
 
     clearElement(this._hslData);
-    this._hslData.appendChild(createTextNode(`${Math.round(hsl.h)}°, ${toIntPercentage(hsl.s)}%, ${toIntPercentage(hsl.l)}%`));
+    this._hslData.appendChild(createTextNode(hslColor.toString()));
 
     clearElement(this._hsvData);
-    this._hsvData.appendChild(createTextNode(`${Math.round(hsv.h)}°, ${toIntPercentage(hsv.s)}%, ${toIntPercentage(hsv.v)}%`));
+    this._hsvData.appendChild(createTextNode(hsvColor.toString()));
   }
 
   /**
    * Update the closest color display
-   * @param {PaletteColor|null} closestColor - The closest palette color or null if no palette
+   * @param {NamedColor|null} closestColor - The closest palette color or null if no palette
    */
   updateClosestColor(closestColor) {
     // Always clear and rebuild the container content
