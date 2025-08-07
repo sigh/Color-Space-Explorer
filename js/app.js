@@ -11,7 +11,9 @@ class ColorSpaceExplorer {
   constructor() {
     this._canvas = document.getElementById('colorCanvas');
     const paletteContainer = document.querySelector('.palette-panel');
-    this._colorPalette = new ColorPalette(paletteContainer);
+    this._colorPalette = new ColorPalette(
+      paletteContainer,
+      () => this._updateRendererFromPalette());
 
     const colorDisplayContainer = document.querySelector('.color-display-section');
     this._colorDisplay = new ColorDisplay(colorDisplayContainer);
@@ -20,27 +22,25 @@ class ColorSpaceExplorer {
   async init() {
     this._renderer = await CanvasRenderer.create(this._canvas);
 
-    const initialColorSpaceView = this._makeInitialColorSpaceView();
+    const initialColorSpace = getAllColorSpaces()[0];
 
     this._uiController = new UIController(
-      initialColorSpaceView, this._updateRenderer.bind(this));
+      initialColorSpace, this._updateRenderer.bind(this));
 
     this._setupMouseHandlers();
-  }
-
-  _makeInitialColorSpaceView() {
-    const initialColorSpace = getAllColorSpaces()[0];
-    const defaultAxis = initialColorSpace.getDefaultAxis();
-    return new ColorSpaceView(
-      initialColorSpace,
-      defaultAxis,
-      defaultAxis.defaultValue
-    );
   }
 
   _updateRenderer(colorSpaceView) {
     const paletteColors = this._colorPalette.getColors();
     this._renderer.renderColorSpace(colorSpaceView, paletteColors);
+  }
+
+  _updateRendererFromPalette() {
+    if (this._uiController) {
+      // Get the current color space view from the UI controller
+      const currentView = this._uiController.getCurrentColorSpaceView();
+      this._updateRenderer(currentView);
+    }
   }
 
   _setupMouseHandlers() {

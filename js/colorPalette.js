@@ -50,11 +50,12 @@ export function createColorItem(color) {
  * Manages the color palette display and functionality
  */
 export class ColorPalette {
-  constructor(container) {
+  constructor(container, onPaletteChange = null) {
     this._colors = [];
     this.container = container;
     this._colorList = null;
     this._dropdown = null;
+    this._onPaletteChange = onPaletteChange || (() => { });
     this._initializeUI();
   }
 
@@ -85,6 +86,7 @@ export class ColorPalette {
     dropdown.addEventListener('change', (event) => {
       this._colors = [...getPreset(event.target.value)];
       this._renderColors();
+      this._onPaletteChange();
     });
 
     this.container.appendChild(dropdown);
@@ -102,10 +104,6 @@ export class ColorPalette {
    * Render the color list
    */
   _renderColors() {
-    if (!this._colorList) {
-      return;
-    }
-
     clearElement(this._colorList);
 
     // Render each color
@@ -124,6 +122,7 @@ export class ColorPalette {
     const newColor = new NamedColor(name, color);
     this._colors.push(newColor);
     this._renderColors();
+    this._onPaletteChange();
   }
 
   /**

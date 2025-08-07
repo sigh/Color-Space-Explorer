@@ -5,7 +5,7 @@ import { ColorSpaceView, getAllColorSpaces, getColorSpaceByType } from './colorS
  * UI controller for handling axis controls and boundaries toggle
  */
 export class UIController {
-  constructor(initialColorSpaceView, onColorSpaceChange) {
+  constructor(initialColorSpace, onColorSpaceChange) {
     // Axis control elements
     this._axisSlider = document.getElementById('axisSlider');
     this._axisValue = document.getElementById('axisValue');
@@ -17,41 +17,28 @@ export class UIController {
     // Callback
     this._onColorSpaceChange = onColorSpaceChange;
 
-    // Initialize the UI with the provided color space view
+    // Initialize the UI with the provided color space
     this._boundariesToggle.addEventListener('change', () => {
-      this._triggerUpdate();
+      const currentColorSpaceView = this.getCurrentColorSpaceView();
+      this._onColorSpaceChange(currentColorSpaceView);
     });
-    this._setupAxisControls(initialColorSpaceView);
+    this._setupColorSpaceControls(initialColorSpace);
   }
 
   /**
-   * Initialize axis controls
-   * @param {ColorSpaceView} initialColorSpaceView - Initial color space view
+   * Initialize color space controls
+   * @param {ColorSpace} initialColorSpace - Initial color space
    */
-  _setupAxisControls(initialColorSpaceView) {
-    // Store references
-    this._colorSpace = initialColorSpaceView.colorSpace;
-    this._currentAxis = initialColorSpaceView.currentAxis;
-
-    // Initialize color space buttons
-    this._setupColorSpaceButtons(this._colorSpace);
-
-    // Initialize axis buttons for the current color space
-    this._updateAxisButtons();
-
-    // Set up slider
+  _setupColorSpaceControls(initialColorSpace) {
+    // Set up slider event listener
     this._axisSlider.addEventListener('input', (event) => {
-      const value = parseInt(event.target.value);
-      const colorSpaceView = new ColorSpaceView(this._colorSpace, this._currentAxis, value, this._boundariesToggle.checked);
-      this._updateAxisDisplay(colorSpaceView);
+      const colorSpaceView = this.getCurrentColorSpaceView();
+      this._updateSliderLabel(colorSpaceView);
       this._onColorSpaceChange(colorSpaceView);
     });
 
-    // Initialize display
-    this._updateAxisDisplay(initialColorSpaceView);
-
-    // Notify change
-    this._onColorSpaceChange(initialColorSpaceView);
+    this._setupColorSpaceButtons(initialColorSpace);
+    this._selectColorSpace(initialColorSpace);
   }
 
   /**
@@ -84,7 +71,7 @@ export class UIController {
 
       // Attach event listener directly
       radio.addEventListener('change', () => {
-        this._selectColorSpace(radio.value);
+        this._selectColorSpace(cs);
       });
     });
   }
@@ -121,69 +108,54 @@ export class UIController {
 
       // Attach event listener directly
       radio.addEventListener('change', () => {
-        this._selectAxisByKey(radio.value);
+        this._selectAxis(axis);
       });
     });
   }
 
   /**
    * Select a new color space type
-   * @param {string} colorSpaceType - Color space type to select (HSV or HSL)
+   * @param {ColorSpace} colorSpace - Color space to select
    */
-  _selectColorSpace(colorSpaceType) {
+  _selectColorSpace(colorSpace) {
     // Update color space
-    this._colorSpace = getColorSpaceByType(colorSpaceType);
+    this._colorSpace = colorSpace;
 
     // Update axis buttons for the new color space
     this._updateAxisButtons();
 
     // Reset to default axis
     const defaultAxis = this._colorSpace.getDefaultAxis();
-    this._currentAxis = defaultAxis;
-
-    // Create new color space view with default axis
-    const colorSpaceView = new ColorSpaceView(
-      this._colorSpace,
-      defaultAxis,
-      defaultAxis.defaultValue,
-      this._boundariesToggle.checked
-    );
-    // Update display
-    this._updateAxisDisplay(colorSpaceView);
-
-    // Notify change
-    this._onColorSpaceChange(colorSpaceView);
+    this._selectAxis(defaultAxis);
   }
 
   /**
-   * Select a specific axis by key
-   * @param {string} axisKey - Key of axis to select
+   * Select a specific axis
+   * @param {Axis} axis - Axis to select
    */
-  _selectAxisByKey(axisKey) {
-    const axis = this._colorSpace.getAxisByKey(axisKey);
+  _selectAxis(axis) {
     this._currentAxis = axis;
 
-    // Create color space view with new axis and its default value
-    const colorSpaceView = new ColorSpaceView(this._colorSpace, axis, axis.defaultValue, this._boundariesToggle.checked);
+    // Set up slider.
+    this._axisSlider.min = axis.min;
+    this._axisSlider.max = axis.max;
+    this._axisSlider.value = axis.defaultValue;
+
+    const colorSpaceView = this.getCurrentColorSpaceView();
 
     // Update display
-    this._updateAxisDisplay(colorSpaceView);
+    this._updateSliderLabel(colorSpaceView);
 
     // Notify change
     this._onColorSpaceChange(colorSpaceView);
   }
 
   /**
-   * Update axis display elements
+   * Update slider labels
    * @param {ColorSpaceView} colorSpaceView - Color space view to display
    */
-  _updateAxisDisplay(colorSpaceView) {
+  _updateSliderLabel(colorSpaceView) {
     const axis = colorSpaceView.currentAxis;
-
-    // Update slider
-    this._axisSlider.min = axis.min;
-    this._axisSlider.max = axis.max;
-    this._axisSlider.value = colorSpaceView.currentValue;
 
     // Update labels
     this._axisLabel.textContent = axis.name;
@@ -191,15 +163,15 @@ export class UIController {
   }
 
   /**
-   * Trigger an update to re-render with current settings
+   * Get the current color space view based on current UI state
+   * @returns {ColorSpaceView} Current color space view
    */
-  _triggerUpdate() {
-    const currentColorSpaceView = new ColorSpaceView(
+  getCurrentColorSpaceView() {
+    return new ColorSpaceView(
       this._colorSpace,
       this._currentAxis,
       parseInt(this._axisSlider.value),
       this._boundariesToggle.checked
     );
-    this._onColorSpaceChange(currentColorSpaceView);
   }
 }

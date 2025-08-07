@@ -44,17 +44,6 @@ function hexToRgb(hex) {
  * Predefined color palette presets
  */
 const ColorPresets = {
-  'RGB Vertex Colors': [
-    new NamedColor('Red', hexToRgb('#FF0000')),
-    new NamedColor('Green', hexToRgb('#00FF00')),
-    new NamedColor('Blue', hexToRgb('#0000FF')),
-    new NamedColor('Yellow', hexToRgb('#FFFF00')),
-    new NamedColor('Cyan', hexToRgb('#00FFFF')),
-    new NamedColor('Magenta', hexToRgb('#FF00FF')),
-    new NamedColor('White', hexToRgb('#FFFFFF')),
-    new NamedColor('Black', hexToRgb('#000000'))
-  ],
-
   // Basic colors from W3C CSS Color Module Level 3 specification:
   // https://www.w3.org/TR/css-color-3/#html4
   'Basic Web Colors': [
@@ -218,5 +207,16 @@ const ColorPresets = {
     new NamedColor('WhiteSmoke', hexToRgb('#F5F5F5')),
     new NamedColor('Yellow', hexToRgb('#FFFF00')),
     new NamedColor('YellowGreen', hexToRgb('#9ACD32'))
-  ]
+  ],
+
+  'RGB Vertex Colors': [
+    new NamedColor('Red', hexToRgb('#FF0000')),
+    new NamedColor('Green', hexToRgb('#00FF00')),
+    new NamedColor('Blue', hexToRgb('#0000FF')),
+    new NamedColor('Yellow', hexToRgb('#FFFF00')),
+    new NamedColor('Cyan', hexToRgb('#00FFFF')),
+    new NamedColor('Magenta', hexToRgb('#FF00FF')),
+    new NamedColor('White', hexToRgb('#FFFFFF')),
+    new NamedColor('Black', hexToRgb('#000000'))
+  ],
 };
