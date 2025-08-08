@@ -5,9 +5,10 @@ import { NamedColor, getPresetNames, getPreset } from './namedColor.js';
 /**
  * Create a color item element styled like palette colors
  * @param {NamedColor|null} color - The color to create an item for, or null for empty state
+ * @param {Function} onDelete - Callback function for delete button click
  * @returns {HTMLElement} The color item element
  */
-export function createColorItem(color) {
+export function createColorItem(color, onDelete = null) {
   const item = createElement('div');
   item.className = 'color-item';
 
@@ -43,6 +44,19 @@ export function createColorItem(color) {
 
   item.appendChild(info);
 
+  // Add delete button if callback provided
+  if (onDelete) {
+    const deleteButton = createElement('button');
+    deleteButton.className = 'color-delete-btn';
+    deleteButton.innerHTML = '×';
+    deleteButton.title = 'Delete color';
+    deleteButton.addEventListener('click', (e) => {
+      e.stopPropagation();
+      onDelete(color);
+    });
+    item.appendChild(deleteButton);
+  }
+
   return item;
 }
 
@@ -55,6 +69,7 @@ export class ColorPalette {
     this.container = container;
     this._colorList = null;
     this._dropdown = null;
+    this._colorCount = null;
     this._onUpdate = onUpdate || (() => { });
     this._initializeUI();
   }
@@ -91,6 +106,11 @@ export class ColorPalette {
 
     this.container.appendChild(dropdown);
 
+    // Create color count display
+    this._colorCount = createElement('div');
+    this._colorCount.className = 'color-count';
+    this.container.appendChild(this._colorCount);
+
     // Create scrollable color list container
     this._colorList = createElement('div');
     this._colorList.className = 'color-list';
@@ -106,10 +126,14 @@ export class ColorPalette {
   _renderColors() {
     clearElement(this._colorList);
 
+    // Update color count display
+    const count = this._colors.length;
+    this._colorCount.textContent = `${count} color${count !== 1 ? 's' : ''}`;
+
     // Render each color
     for (let i = 0; i < this._colors.length; i++) {
       const color = this._colors[i];
-      const colorItem = createColorItem(color);
+      const colorItem = createColorItem(color, this._deleteColor.bind(this));
 
       // Add hover event listeners for highlighting
       colorItem.addEventListener('mouseenter', () => {
@@ -121,6 +145,19 @@ export class ColorPalette {
       });
 
       this._colorList.appendChild(colorItem);
+    }
+  }
+
+  /**
+   * Delete a color from the palette
+   * @param {NamedColor} colorToDelete - The color object to delete
+   */
+  _deleteColor(colorToDelete) {
+    const index = this._colors.indexOf(colorToDelete);
+    if (index !== -1) {
+      this._colors.splice(index, 1);
+      this._renderColors();
+      this._onUpdate();
     }
   }
 
