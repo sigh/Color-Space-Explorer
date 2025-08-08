@@ -82,7 +82,7 @@ export class ColorPalette {
     clearElement(this.container);
 
     // Create title
-    const title = createElement('h3', 'Color Palette');
+    const title = createElement('h2', 'Color Palette');
     this.container.appendChild(title);
 
     // Create preset dropdown

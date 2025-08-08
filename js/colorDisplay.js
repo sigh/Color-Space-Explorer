@@ -14,19 +14,50 @@ export class ColorDisplay {
     this._rgbData = container.querySelector('.rgb-data');
     this._hslData = container.querySelector('.hsl-data');
     this._hsvData = container.querySelector('.hsv-data');
+    this._titleElement = container.querySelector('.color-info-title');
 
     // Closest color display element within the container
     this._closestColorContainer = container.querySelector('.closest-color-container');
 
     // Set default state
-    this.clear();
+    this.clearColor();
   }
 
   /**
-   * Update the hovered color display
+   * Set the selected color and update display accordingly
+   * @param {RgbColor} rgbColor - RGB color instance with normalized coordinates
+   * @param {NamedColor|null} closestColor - The closest palette color or null if no palette
+   */
+  setSelectedColor(rgbColor, closestColor) {
+    this._setCurrentColor(rgbColor);
+    this._setClosestColor(closestColor);
+    this._setTitle(rgbColor, true);
+  }
+
+  /**
+   * Set the color and update display accordingly
+   * @param {RgbColor} rgbColor - RGB color instance with normalized coordinates
+   * @param {NamedColor|null} closestColor - The closest palette color or null if no palette
+   */
+  setColor(rgbColor, closestColor) {
+    this._setCurrentColor(rgbColor);
+    this._setClosestColor(closestColor);
+    this._setTitle(rgbColor, false);
+  }
+
+  _setTitle(rgbColor, selected) {
+    if (!rgbColor) {
+      this._titleElement.textContent = 'No Color';
+    } else {
+      this._titleElement.textContent = selected ? 'Selected Color' : 'Current Color';
+    }
+  }
+
+  /**
+   * Set the current color display
    * @param {RgbColor} rgbColor - RGB color instance with normalized coordinates
    */
-  updateHoveredColor(rgbColor) {
+  _setCurrentColor(rgbColor) {
     // Convert to CSS string for display
     const cssColor = rgbToCssString(rgbColor);
 
@@ -50,10 +81,10 @@ export class ColorDisplay {
   }
 
   /**
-   * Update the closest color display
+   * Set the closest color display
    * @param {NamedColor|null} closestColor - The closest palette color or null if no palette
    */
-  updateClosestColor(closestColor) {
+  _setClosestColor(closestColor) {
     // Always clear and rebuild the container content
     clearElement(this._closestColorContainer);
 
@@ -65,7 +96,9 @@ export class ColorDisplay {
   /**
    * Clear color displays when not hovering
    */
-  clear() {
+  clearColor() {
+    this._setTitle(null, false);
+
     // Reset color swatch to empty state
     this._colorSwatch.classList.remove('has-color');
 
@@ -74,6 +107,6 @@ export class ColorDisplay {
     clearElement(this._hslData);
     clearElement(this._hsvData);
 
-    this.updateClosestColor(null);
+    this._setClosestColor(null);
   }
 }

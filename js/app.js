@@ -9,10 +9,15 @@ import { ColorDisplay } from './colorDisplay.js';
  */
 class ColorSpaceExplorer {
   constructor() {
-    this._canvas = document.getElementById('colorCanvas');
+    this._canvasContainer = document.querySelector('.canvas-container');
     this._debouncedUpdateRenderer = this._createDebouncedUpdater((options) => {
       this._updateRenderer(options);
     });
+
+    this._selectionIndicator = null;
+
+    const colorDisplayContainer = document.querySelector('.color-display-section');
+    this._colorDisplay = new ColorDisplay(colorDisplayContainer);
 
     const paletteContainer = document.querySelector('.palette-panel');
     this._colorPalette = new ColorPalette(
@@ -21,10 +26,27 @@ class ColorSpaceExplorer {
 
     const initialColorSpace = getAllColorSpaces()[0];
     this._uiController = new UIController(
-      initialColorSpace, this._debouncedUpdateRenderer.bind(this));
+      initialColorSpace, (options) => {
+        this._clearSelection();  // Clear selection on color space change
+        this._debouncedUpdateRenderer(options);
+      });
+  }
 
-    const colorDisplayContainer = document.querySelector('.color-display-section');
-    this._colorDisplay = new ColorDisplay(colorDisplayContainer);
+  async init() {
+    this._renderer = await CanvasRenderer.create(this._canvasContainer);
+    this._setupMouseHandlers();
+    this._debouncedUpdateRenderer();
+  }
+
+  /**
+   * Clear the current selection
+   */
+  _clearSelection() {
+    if (this._selectionIndicator) {
+      this._selectionIndicator.remove();
+      this._selectionIndicator = null;
+      this._colorDisplay.clearColor();
+    }
   }
 
   /**
@@ -57,12 +79,6 @@ class ColorSpaceExplorer {
     };
   }
 
-  async init() {
-    this._renderer = await CanvasRenderer.create(this._canvas);
-    this._setupMouseHandlers();
-    this._debouncedUpdateRenderer();
-  }
-
   _updateRenderer(options) {
     if (!this._renderer) return;
     const colorSpaceView = this._uiController.getCurrentColorSpaceView();
@@ -74,23 +90,68 @@ class ColorSpaceExplorer {
   }
 
   _setupMouseHandlers() {
-    // Mouse move handler for hover effect
-    this._canvas.addEventListener('mousemove', (event) => {
-      const rect = this._canvas.getBoundingClientRect();
+    const setColorForMouseEvent = (event, isSelecting) => {
+      const rect = this._canvasContainer.getBoundingClientRect();
       const x = event.clientX - rect.left;
       const y = event.clientY - rect.top;
 
       const [rgbColor, closestColor] = this._renderer.getColorAt(x, y);
 
-      // Update color display
-      this._colorDisplay.updateHoveredColor(rgbColor);
-      this._colorDisplay.updateClosestColor(closestColor);
+      if (isSelecting) {
+        this._colorDisplay.setSelectedColor(rgbColor, closestColor);
+        this._createSelectionIndicator(x, y);
+      } else {
+        this._colorDisplay.setColor(rgbColor, closestColor);
+      }
+    };
+
+    // Mouse move handler for hover effect
+    this._canvasContainer.addEventListener('mousemove', (event) => {
+      // Skip hover updates if there's a selection
+      if (this._selectionIndicator) return;
+
+      setColorForMouseEvent(event, false);
     });
 
     // Mouse leave handler to reset to default
-    this._canvas.addEventListener('mouseleave', () => {
-      this._colorDisplay.clear();
+    this._canvasContainer.addEventListener('mouseleave', () => {
+      // Skip clearing if there's a selection
+      if (this._selectionIndicator) return;
+
+      this._colorDisplay.clearColor();
     });
+
+    // Click handler for canvas panel
+    const centerPanel = document.querySelector('.canvas-panel');
+    centerPanel.addEventListener('click', (event) => {
+      const selectionClicked = event.target === this._selectionIndicator;
+      const canvasClicked = this._canvasContainer.contains(event.target);
+
+      this._clearSelection();
+      if (!canvasClicked) return;
+
+      setColorForMouseEvent(event, !selectionClicked);
+    });
+  }
+
+  /**
+   * Create visual selection indicator
+   * @param {number} x - X coordinate relative to canvas
+   * @param {number} y - Y coordinate relative to canvas
+   */
+  _createSelectionIndicator(x, y) {
+    this._clearSelection();
+
+    // Create indicator element positioned absolutely within canvas container
+    this._selectionIndicator = document.createElement('div');
+    this._selectionIndicator.className = 'selection-indicator';
+
+    // Position absolutely within the canvas container (CSS handles centering)
+    this._selectionIndicator.style.left = `${x}px`;
+    this._selectionIndicator.style.top = `${y}px`;
+
+    // Append to canvas container
+    this._canvasContainer.appendChild(this._selectionIndicator);
   }
 }
 

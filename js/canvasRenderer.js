@@ -4,8 +4,8 @@ import { getAllColorSpaces, RgbColor } from "./colorSpace.js";
  * WebGL2 Canvas renderer for color spaces with framebuffer rendering
  */
 export class CanvasRenderer {
-  constructor(canvas, vertexShaderSource, computeFragmentShaderSource, renderFragmentShaderSource) {
-    this.canvas = canvas;
+  constructor(canvasContainer, vertexShaderSource, computeFragmentShaderSource, renderFragmentShaderSource) {
+    const canvas = canvasContainer.querySelector('canvas');
     this._gl = canvas.getContext('webgl2', { preserveDrawingBuffer: true });
 
     if (!this._gl) {
@@ -21,10 +21,10 @@ export class CanvasRenderer {
 
   /**
    * Factory function to create a CanvasRenderer with shader loading
-   * @param {HTMLCanvasElement} canvas - The canvas element
+   * @param {HTMLCanvasElement} canvasContainer - The container for the canvas element
    * @returns {Promise<CanvasRenderer>} - Promise that resolves to initialized renderer
    */
-  static async create(canvas) {
+  static async create(canvasContainer) {
     // Load shaders from files
     const [vertexShaderSource, computeFragmentShaderSource, renderFragmentShaderSource] = await Promise.all([
       fetch('./shaders/vertex.glsl').then(r => r.text()),
@@ -32,7 +32,11 @@ export class CanvasRenderer {
       fetch('./shaders/render_fragment.glsl').then(r => r.text())
     ]);
 
-    return new CanvasRenderer(canvas, vertexShaderSource, computeFragmentShaderSource, renderFragmentShaderSource);
+    return new CanvasRenderer(
+      canvasContainer,
+      vertexShaderSource,
+      computeFragmentShaderSource,
+      renderFragmentShaderSource);
   }
 
   /**
