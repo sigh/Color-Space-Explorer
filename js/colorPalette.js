@@ -9,9 +9,10 @@ const MAX_PALETTE_COLORS = 200;
  * Create a color item element styled like palette colors
  * @param {NamedColor|null} color - The color to create an item for, or null for empty state
  * @param {Function} onDelete - Callback function for delete button click
+ * @param {Function} onNameEdit - Callback function for name edit (color, newName)
  * @returns {HTMLElement} The color item element
  */
-export function createColorItem(color, onDelete = null) {
+export function createColorItem(color, onDelete = null, onNameEdit = null) {
   const item = createElement('div');
   item.className = 'color-item';
 
@@ -38,6 +39,11 @@ export function createColorItem(color, onDelete = null) {
   name.className = 'color-name';
   name.appendChild(createTextNode(color ? color.name : 'No Palette'));
 
+  // Make name editable if callback provided
+  if (onNameEdit) {
+    _setupNameEditing(name, color, onNameEdit);
+  }
+
   const rgbValues = createElement('div');
   rgbValues.className = 'color-values';
   rgbValues.appendChild(createTextNode(color.rgbColor.toString()));
@@ -63,6 +69,34 @@ export function createColorItem(color, onDelete = null) {
   return item;
 }
 
+function _setupNameEditing(nameElement, color, onNameEdit) {
+  nameElement.classList.add('editable');
+  nameElement.contentEditable = true;
+  nameElement.title = 'Click to edit name';
+
+  // Handle editing events
+  nameElement.addEventListener('blur', () => {
+    const newName = nameElement.textContent.trim();
+    if (newName && newName !== color.name) {
+      onNameEdit(color, newName);
+    } else {
+      // Restore original name if invalid
+      nameElement.textContent = color.name;
+    }
+  });
+
+  nameElement.addEventListener('keydown', (e) => {
+    if (e.key === 'Enter') {
+      e.preventDefault();
+      nameElement.blur(); // Trigger save
+    } else if (e.key === 'Escape') {
+      e.preventDefault();
+      nameElement.textContent = color.name; // Restore original
+      nameElement.blur();
+    }
+  });
+}
+
 /**
  * Manages the color palette display and functionality
  */
@@ -72,7 +106,6 @@ export class ColorPalette {
     this.container = container;
     this._colorList = null;
     this._dropdown = null;
-    this._colorCount = null;
     this._addButton = null;
     this._colorDisplay = colorDisplay;
     this._onUpdate = onUpdate || (() => { });
@@ -107,6 +140,12 @@ export class ColorPalette {
       dropdown.appendChild(option);
     });
 
+    // Add "Custom" option for modified palettes
+    const customOption = createElement('option', 'Custom');
+    customOption.value = 'custom';
+    customOption.disabled = true;
+    dropdown.appendChild(customOption);
+
     // Add change event listener
     dropdown.addEventListener('change', (event) => {
       this._colors = [...getPreset(event.target.value)];
@@ -117,8 +156,8 @@ export class ColorPalette {
     this.container.appendChild(dropdown);
 
     // Create color count display with inline Add button
-    this._colorCount = createElement('div');
-    this._colorCount.className = 'color-count';
+    const colorAddContainer = createElement('div');
+    colorAddContainer.className = 'color-add-container';
 
     // Create Add button (positioned first, to the left)
     this._addButton = createElement('button', 'Add selected color');
@@ -127,12 +166,22 @@ export class ColorPalette {
     this._addButton.addEventListener('click', () => {
       this.addColor(...this._colorDisplay.getSelectedColors());
     });
-    this._colorCount.appendChild(this._addButton);
+    colorAddContainer.appendChild(this._addButton);
 
-    this._countText = createElement('span', '0 colors');
-    this._colorCount.appendChild(this._countText);
+    const countTextContainer = createElement('div');
+    {
+      const currentCount = createElement('div');
+      currentCount.className = 'count-current';
+      countTextContainer.appendChild(currentCount);
+      this._countText = currentCount;
 
-    this.container.appendChild(this._colorCount);
+      const maxCount = createElement('div', `out of ${MAX_PALETTE_COLORS}`);
+      maxCount.className = 'count-max';
+      countTextContainer.appendChild(maxCount);
+    }
+    colorAddContainer.appendChild(countTextContainer);
+
+    this.container.appendChild(colorAddContainer);
 
     // Create scrollable color list container
     this._colorList = createElement('div');
@@ -149,9 +198,9 @@ export class ColorPalette {
   _renderColors() {
     clearElement(this._colorList);
 
-    // Update color count display with max limit
+    // Update color count display
     const count = this._colors.length;
-    this._countText.textContent = `${count}/${MAX_PALETTE_COLORS} color${count !== 1 ? 's' : ''}`;
+    this._countText.textContent = `${count} color${count !== 1 ? 's' : ''}`;
 
     // Update button state based on current selection and limit
     this._updateAddButtonState();
@@ -159,7 +208,11 @@ export class ColorPalette {
     // Render each color
     for (let i = 0; i < this._colors.length; i++) {
       const color = this._colors[i];
-      const colorItem = createColorItem(color, this._deleteColor.bind(this));
+      const colorItem = createColorItem(
+        color,
+        this._deleteColor.bind(this),
+        this._editColorName.bind(this)
+      );
 
       // Add hover event listeners for highlighting
       colorItem.addEventListener('mouseenter', () => {
@@ -182,6 +235,23 @@ export class ColorPalette {
     const index = this._colors.indexOf(colorToDelete);
     if (index !== -1) {
       this._colors.splice(index, 1);
+      this._setCustomState();
+      this._renderColors();
+      this._onUpdate();
+    }
+  }
+
+  /**
+   * Edit a color's name
+   * @param {NamedColor} color - The color to edit
+   * @param {string} newName - The new name for the color
+   */
+  _editColorName(color, newName) {
+    const index = this._colors.indexOf(color);
+    if (index !== -1 && newName.trim()) {
+      // Update the color's name
+      this._colors[index] = new NamedColor(newName.trim(), color.rgbColor);
+      this._setCustomState();
       this._renderColors();
       this._onUpdate();
     }
@@ -200,10 +270,21 @@ export class ColorPalette {
     const name = this._generateColorName(rgbColor, closestColor);
 
     this._colors.unshift(new NamedColor(name, rgbColor));
+    this._setCustomState();
     this._renderColors();
     this._onUpdate();
-    this._colorList.firstChild.scrollIntoView(
-      { behavior: 'smooth', block: 'start' });
+
+    // Highlight the newly added item
+    const newItem = this._colorList.firstChild;
+    if (newItem) {
+      newItem.classList.add('newly-added');
+      // Remove the highlight after animation
+      setTimeout(() => {
+        newItem.classList.remove('newly-added');
+      }, 4000);
+    }
+
+    newItem.scrollIntoView({ behavior: 'smooth', block: 'start' });
 
     return true;
   }
@@ -222,6 +303,13 @@ export class ColorPalette {
     // Button is enabled when there's a selection AND we're not at the limit
     const isEnabled = hasSelection && !isAtLimit;
     this._addButton.disabled = !isEnabled;
+  }
+
+  /**
+   * Set the dropdown to "Custom" state when palette is modified
+   */
+  _setCustomState() {
+    this._dropdown.value = 'custom';
   }
 
   /**

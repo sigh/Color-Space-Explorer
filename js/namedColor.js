@@ -112,7 +112,6 @@ const ColorPresets = {
     new NamedColor('FireBrick', hexToRgb('#B22222')),
     new NamedColor('FloralWhite', hexToRgb('#FFFAF0')),
     new NamedColor('ForestGreen', hexToRgb('#228B22')),
-    new NamedColor('Fuchsia', hexToRgb('#FF00FF')),
     new NamedColor('Gainsboro', hexToRgb('#DCDCDC')),
     new NamedColor('GhostWhite', hexToRgb('#F8F8FF')),
     new NamedColor('Gold', hexToRgb('#FFD700')),
