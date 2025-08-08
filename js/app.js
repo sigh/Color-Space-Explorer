@@ -22,6 +22,7 @@ class ColorSpaceExplorer {
     const paletteContainer = document.querySelector('.palette-panel');
     this._colorPalette = new ColorPalette(
       paletteContainer,
+      this._colorDisplay,
       this._debouncedUpdateRenderer.bind(this));
 
     const initialColorSpace = getAllColorSpaces()[0];
@@ -45,7 +46,7 @@ class ColorSpaceExplorer {
     if (this._selectionIndicator) {
       this._selectionIndicator.remove();
       this._selectionIndicator = null;
-      this._colorDisplay.clearColor();
+      this._colorDisplay.clearColors();
     }
   }
 
@@ -98,10 +99,10 @@ class ColorSpaceExplorer {
       const [rgbColor, closestColor] = this._renderer.getColorAt(x, y);
 
       if (isSelecting) {
-        this._colorDisplay.setSelectedColor(rgbColor, closestColor);
+        this._colorDisplay.setSelectedColors(rgbColor, closestColor);
         this._createSelectionIndicator(x, y);
       } else {
-        this._colorDisplay.setColor(rgbColor, closestColor);
+        this._colorDisplay.setColors(rgbColor, closestColor);
       }
     };
 
@@ -118,7 +119,7 @@ class ColorSpaceExplorer {
       // Skip clearing if there's a selection
       if (this._selectionIndicator) return;
 
-      this._colorDisplay.clearColor();
+      this._colorDisplay.clearColors();
     });
 
     // Click handler for canvas panel

@@ -8,6 +8,8 @@ import { createColorItem } from './colorPalette.js';
 export class ColorDisplay {
   constructor(container) {
     this._container = container;
+    this._onColorChangeCallback = () => { };
+    this._selectedColors = [null, null]; // [selectedColor, closestColor]
 
     // Color display elements within the container
     this._colorSwatch = container.querySelector('.color-swatch');
@@ -20,7 +22,7 @@ export class ColorDisplay {
     this._closestColorContainer = container.querySelector('.closest-color-container');
 
     // Set default state
-    this.clearColor();
+    this.clearColors();
   }
 
   /**
@@ -28,10 +30,12 @@ export class ColorDisplay {
    * @param {RgbColor} rgbColor - RGB color instance with normalized coordinates
    * @param {NamedColor|null} closestColor - The closest palette color or null if no palette
    */
-  setSelectedColor(rgbColor, closestColor) {
+  setSelectedColors(rgbColor, closestColor) {
+    this._selectedColors = [rgbColor, closestColor];
     this._setCurrentColor(rgbColor);
     this._setClosestColor(closestColor);
     this._setTitle(rgbColor, true);
+    this._onColorChangeCallback();
   }
 
   /**
@@ -39,10 +43,12 @@ export class ColorDisplay {
    * @param {RgbColor} rgbColor - RGB color instance with normalized coordinates
    * @param {NamedColor|null} closestColor - The closest palette color or null if no palette
    */
-  setColor(rgbColor, closestColor) {
+  setColors(rgbColor, closestColor) {
+    this._selectedColors = [null, null];
     this._setCurrentColor(rgbColor);
     this._setClosestColor(closestColor);
     this._setTitle(rgbColor, false);
+    this._onColorChangeCallback();
   }
 
   _setTitle(rgbColor, selected) {
@@ -96,7 +102,8 @@ export class ColorDisplay {
   /**
    * Clear color displays when not hovering
    */
-  clearColor() {
+  clearColors() {
+    this._selectedColors = [null, null];
     this._setTitle(null, false);
 
     // Reset color swatch to empty state
@@ -108,5 +115,22 @@ export class ColorDisplay {
     clearElement(this._hsvData);
 
     this._setClosestColor(null);
+    this._onColorChangeCallback();
+  }
+
+  /**
+   * Get the selected colors for adding to palette
+   * @returns {Array} Array containing [selectedColor, closestColor] where selectedColor is RgbColor|null and closestColor is NamedColor|null
+   */
+  getSelectedColors() {
+    return [...this._selectedColors];
+  }
+
+  /**
+   * Register a callback for color change events
+   * @param {Function} callback - Callback function that receives notification objects
+   */
+  onColorChange(callback) {
+    this._onColorChangeCallback = callback;
   }
 }

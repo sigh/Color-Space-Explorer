@@ -1,5 +1,5 @@
 import { clearElement, createElement } from './utils.js';
-import { ColorSpaceView, getAllColorSpaces, getColorSpaceByType } from './colorSpace.js';
+import { ColorSpaceView, getAllColorSpaces } from './colorSpace.js';
 
 /**
  * UI controller for handling axis controls and boundaries toggle

@@ -32,6 +32,10 @@
   --accent-primary: #6366f1;
   --accent-hover: #5855eb;
 
+  /* Add button colors */
+  --add-btn-bg: #16a34a;
+  --add-btn-bg-hover: #047857;
+
   /* Border radius */
   --radius-slider: 3px;
   --radius-button: 4px;
@@ -43,6 +47,7 @@
 }
 
 body {
+  padding: 0;
   font-family: 'Segoe UI', Arial, sans-serif;
   background: var(--bg-app);
   color: var(--text-primary);
@@ -190,22 +195,28 @@ h3 {
 
 /* Button styles */
 .radio-button,
-.color-delete-btn {
+.color-delete-btn,
+.add-color-btn {
   background: transparent;
   border: none;
   cursor: pointer;
-  transition: all 0.15s ease;
-}
-
-.radio-button {
-  flex: 1;
-  color: var(--text-unselected);
   font-size: 12px;
   font-weight: 500;
   text-transform: uppercase;
   letter-spacing: 0.05em;
   padding: 8px 12px;
   border-radius: var(--radius-button);
+  color: var(--text-unselected);
+  transition: all 0.15s ease;
+}
+
+.radio-button {
+  flex: 1;
+}
+
+.add-color-btn {
+  background: var(--add-btn-bg);
+  color: var(--text-primary);
 }
 
 .radio-button input {
@@ -215,6 +226,11 @@ h3 {
 .radio-button:hover {
   color: var(--text-secondary);
   background: var(--bg-surface-hover);
+}
+
+.add-color-btn:hover {
+  background: var(--add-btn-bg-hover);
+  color: var(--text-secondary);
 }
 
 .radio-button:has(input:checked) {
@@ -230,18 +246,29 @@ h3 {
   position: absolute;
   top: 50%;
   right: 8px;
-  transform: translateY(-50%);
-  width: 20px;
-  height: 20px;
-  border-radius: var(--radius-button);
-  color: var(--text-unselected);
-  font-size: 16px;
-  font-weight: bold;
+  transform: translateY(-50%) scale(1.5);
+  width: 16px;
+  height: 16px;
+  padding: 0;
 }
 
 .color-delete-btn:hover {
   background: var(--bg-danger);
   color: var(--text-danger);
+}
+
+.add-color-btn:disabled,
+.add-color-btn.disabled {
+  background: var(--bg-surface);
+  color: var(--text-muted);
+  cursor: not-allowed;
+  opacity: 0.6;
+}
+
+.add-color-btn:hover:disabled,
+.add-color-btn:hover.disabled {
+  background: var(--bg-surface);
+  color: var(--text-muted);
 }
 
 /* Form controls */
@@ -402,9 +429,11 @@ h3 {
 .color-count {
   font-size: 12px;
   color: var(--text-muted);
-  text-align: right;
   padding: 8px 0;
   margin: 8px 0;
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
 }
 
 /* Utility classes */
