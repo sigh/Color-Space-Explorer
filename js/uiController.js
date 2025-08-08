@@ -15,12 +15,11 @@ export class UIController {
     this._boundariesToggle = document.getElementById('boundariesToggle');
 
     // Callback
-    this._onColorSpaceChange = onColorSpaceChange;
+    this._onColorViewUpdate = onColorSpaceChange;
 
     // Initialize the UI with the provided color space
     this._boundariesToggle.addEventListener('change', () => {
-      const currentColorSpaceView = this.getCurrentColorSpaceView();
-      this._onColorSpaceChange(currentColorSpaceView);
+      this._onColorViewUpdate();
     });
     this._setupColorSpaceControls(initialColorSpace);
   }
@@ -31,10 +30,10 @@ export class UIController {
    */
   _setupColorSpaceControls(initialColorSpace) {
     // Set up slider event listener
-    this._axisSlider.addEventListener('input', (event) => {
+    this._axisSlider.addEventListener('input', () => {
       const colorSpaceView = this.getCurrentColorSpaceView();
       this._updateSliderLabel(colorSpaceView);
-      this._onColorSpaceChange(colorSpaceView);
+      this._onColorViewUpdate();
     });
 
     this._setupColorSpaceButtons(initialColorSpace);
@@ -147,7 +146,7 @@ export class UIController {
     this._updateSliderLabel(colorSpaceView);
 
     // Notify change
-    this._onColorSpaceChange(colorSpaceView);
+    this._onColorViewUpdate();
   }
 
   /**

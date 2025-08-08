@@ -66,6 +66,7 @@ export class CanvasRenderer {
       positionLocation: gl.getAttribLocation(renderProgram, 'a_position'),
       colorTextureLocation: gl.getUniformLocation(renderProgram, 'u_colorTexture'),
       showBoundariesLocation: gl.getUniformLocation(renderProgram, 'u_showBoundaries'),
+      highlightPaletteIndexLocation: gl.getUniformLocation(renderProgram, 'u_highlightPaletteIndex'),
     };
 
     // Create framebuffer, texture, and vertex buffer
@@ -171,8 +172,9 @@ export class CanvasRenderer {
    * Render a color space view with palette colors
    * @param {ColorSpaceView} colorSpaceView - Immutable color space view
    * @param {Array<NamedColor>} paletteColors - Array of palette colors to find closest matches for
+   * @param {number|null} highlightPaletteIndex - Index of palette color to highlight (null for no highlight)
    */
-  renderColorSpace(colorSpaceView, paletteColors = []) {
+  renderColorSpace(colorSpaceView, paletteColors = [], highlightPaletteIndex = null) {
     // Store palette colors for consistency with indices
     this._paletteColors = [...paletteColors];
 
@@ -180,7 +182,7 @@ export class CanvasRenderer {
     this._computePhase(colorSpaceView, paletteColors);
 
     // Render phase: Render framebuffer texture to canvas
-    this._renderPhase(colorSpaceView.showBoundaries);
+    this._renderPhase(colorSpaceView.showBoundaries, highlightPaletteIndex);
   }
 
   /**
@@ -227,8 +229,9 @@ export class CanvasRenderer {
   /**
    * Render phase: Render framebuffer texture to canvas
    * @param {boolean} showBoundaries - Whether to show region boundaries
+   * @param {number|null} highlightPaletteIndex - Index of palette color to highlight (null for no highlight)
    */
-  _renderPhase(showBoundaries = true) {
+  _renderPhase(showBoundaries = true, highlightPaletteIndex = null) {
     const gl = this._gl;
 
     // Bind default framebuffer (canvas)
@@ -246,6 +249,9 @@ export class CanvasRenderer {
 
     // Set boundaries visibility uniform
     gl.uniform1i(this._render.showBoundariesLocation, showBoundaries ? 1 : 0);
+
+    // Set highlight palette index uniform (convert null to -1 for shader)
+    gl.uniform1i(this._render.highlightPaletteIndexLocation, highlightPaletteIndex ?? -1);
 
     // Draw
     gl.drawArrays(gl.TRIANGLE_STRIP, 0, 4);

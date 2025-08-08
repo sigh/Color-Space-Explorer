@@ -1,6 +1,6 @@
 import { CanvasRenderer } from './canvasRenderer.js';
 import { UIController } from './uiController.js';
-import { ColorSpaceView, getAllColorSpaces } from './colorSpace.js';
+import { getAllColorSpaces } from './colorSpace.js';
 import { ColorPalette } from './colorPalette.js';
 import { ColorDisplay } from './colorDisplay.js';
 
@@ -10,37 +10,67 @@ import { ColorDisplay } from './colorDisplay.js';
 class ColorSpaceExplorer {
   constructor() {
     this._canvas = document.getElementById('colorCanvas');
+    this._debouncedUpdateRenderer = this._createDebouncedUpdater((options) => {
+      this._updateRenderer(options);
+    });
+
     const paletteContainer = document.querySelector('.palette-panel');
     this._colorPalette = new ColorPalette(
       paletteContainer,
-      () => this._updateRendererFromPalette());
+      this._debouncedUpdateRenderer.bind(this));
+
+    const initialColorSpace = getAllColorSpaces()[0];
+    this._uiController = new UIController(
+      initialColorSpace, this._debouncedUpdateRenderer.bind(this));
 
     const colorDisplayContainer = document.querySelector('.color-display-section');
     this._colorDisplay = new ColorDisplay(colorDisplayContainer);
   }
 
+  /**
+   * Creates a debounced function that can handle delayed execution
+   * @param {Function} func - The function to debounce
+   * @returns {Function} The debounced function
+   */
+  _createDebouncedUpdater(func) {
+    let timeoutId = null;
+
+    return (options) => {
+      const delayMs = options?.delayMs;
+
+      // Clear any existing timeout
+      if (timeoutId) {
+        clearTimeout(timeoutId);
+        timeoutId = null;
+      }
+
+      if (delayMs && delayMs > 0) {
+        // Set up delayed execution
+        timeoutId = setTimeout(() => {
+          func(options);
+          timeoutId = null;
+        }, delayMs);
+      } else {
+        // Immediate execution
+        func(options);
+      }
+    };
+  }
+
   async init() {
     this._renderer = await CanvasRenderer.create(this._canvas);
-
-    const initialColorSpace = getAllColorSpaces()[0];
-
-    this._uiController = new UIController(
-      initialColorSpace, this._updateRenderer.bind(this));
-
     this._setupMouseHandlers();
+    this._debouncedUpdateRenderer();
   }
 
-  _updateRenderer(colorSpaceView) {
+  _updateRenderer(options) {
+    if (!this._renderer) return;
+    const colorSpaceView = this._uiController.getCurrentColorSpaceView();
     const paletteColors = this._colorPalette.getColors();
-    this._renderer.renderColorSpace(colorSpaceView, paletteColors);
-  }
-
-  _updateRendererFromPalette() {
-    if (this._uiController) {
-      // Get the current color space view from the UI controller
-      const currentView = this._uiController.getCurrentColorSpaceView();
-      this._updateRenderer(currentView);
-    }
+    this._renderer.renderColorSpace(
+      colorSpaceView,
+      paletteColors,
+      options?.highlightIndex);
   }
 
   _setupMouseHandlers() {
