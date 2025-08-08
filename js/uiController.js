@@ -5,7 +5,7 @@ import { ColorSpaceView, getAllColorSpaces } from './colorSpace.js';
  * UI controller for handling axis controls and boundaries toggle
  */
 export class UIController {
-  constructor(initialColorSpace, onColorSpaceChange) {
+  constructor(initialColorSpaceView, onColorSpaceChange) {
     // Axis control elements
     this._axisSlider = document.getElementById('axisSlider');
     this._axisValue = document.getElementById('axisValue');
@@ -17,11 +17,17 @@ export class UIController {
     // Callback
     this._onColorViewUpdate = onColorSpaceChange;
 
-    // Initialize the UI with the provided color space
+    // Initialize the UI with the provided color space view
     this._boundariesToggle.addEventListener('change', () => {
       this._onColorViewUpdate();
     });
-    this._setupColorSpaceControls(initialColorSpace);
+    this._setupColorSpaceControls(initialColorSpaceView.colorSpace);
+
+    // Set the current state from the view
+    this._selectAxis(initialColorSpaceView.currentAxis);
+    this._axisSlider.value = initialColorSpaceView.currentValue;
+    this._updateSliderLabel(initialColorSpaceView);
+    this._boundariesToggle.checked = initialColorSpaceView.showBoundaries;
   }
 
   /**

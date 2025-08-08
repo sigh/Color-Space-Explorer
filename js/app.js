@@ -1,8 +1,9 @@
 import { CanvasRenderer } from './canvasRenderer.js';
 import { UIController } from './uiController.js';
-import { getAllColorSpaces } from './colorSpace.js';
+import { getAllColorSpaces, ColorSpaceView, getColorSpaceByType } from './colorSpace.js';
 import { ColorPalette } from './colorPalette.js';
 import { ColorDisplay } from './colorDisplay.js';
+import { deferUntilAnimationFrame } from './utils.js';
 
 /**
  * Main application class
@@ -10,9 +11,8 @@ import { ColorDisplay } from './colorDisplay.js';
 class ColorSpaceExplorer {
   constructor() {
     this._canvasContainer = document.querySelector('.canvas-container');
-    this._debouncedUpdateRenderer = this._createDebouncedUpdater((options) => {
-      this._updateRenderer(options);
-    });
+    this._debouncedUpdateRenderer = this._createDebouncedUpdater(
+      deferUntilAnimationFrame(this._updateRenderer.bind(this)));
 
     this._selectionIndicator = null;
 
@@ -25,9 +25,11 @@ class ColorSpaceExplorer {
       this._colorDisplay,
       this._debouncedUpdateRenderer.bind(this));
 
-    const initialColorSpace = getAllColorSpaces()[0];
+    // Try to load state from URL, otherwise use defaults
+    const initialColorSpaceView = URLStateManager.deserializeColorSpaceViewFromURL();
+
     this._uiController = new UIController(
-      initialColorSpace, (options) => {
+      initialColorSpaceView, (options) => {
         this._clearSelection();  // Clear selection on color space change
         this._debouncedUpdateRenderer(options);
       });
@@ -36,7 +38,46 @@ class ColorSpaceExplorer {
   async init() {
     this._renderer = await CanvasRenderer.create(this._canvasContainer);
     this._setupMouseHandlers();
-    this._debouncedUpdateRenderer();
+    this._updateRenderer(); // No deferral
+
+    // Initialize selection from URL fragment after renderer has had time to render
+    // Use requestAnimationFrame to ensure the render is complete
+    const coordinates = URLStateManager.deserializeSelectionFromFragment();
+    if (coordinates) {
+      requestAnimationFrame(() => {
+        this._initializeSelectionFromURL(coordinates);
+      });
+    }
+  }
+
+  /**
+   * Initialize selection from URL fragment if coordinates are present
+   * @param {Array<number>} coordinates - Canvas coordinates as [x, y]
+   */
+  _initializeSelectionFromURL(coordinates) {
+    const [x, y] = coordinates;
+
+    // Validate coordinates are within canvas bounds
+    const rect = this._canvasContainer.getBoundingClientRect();
+    if (x < 0 || x >= rect.width || y < 0 || y >= rect.height) return;
+
+    // Get color at the coordinates and set as selected
+    const [rgbColor, closestColor] = this._renderer.getColorAt(x, y);
+    this.setSelection(coordinates, rgbColor, closestColor);
+  }
+
+  /**
+   * Set the selected color
+   * @param {Array<number>} coordinates - Canvas coordinates as [x, y]
+   * @param {Array<number>} rgbColor - RGB color value as [r, g, b]
+   * @param {Array<number>} closestColor - Closest color value as [r, g, b]
+   */
+  setSelection(coordinates, rgbColor, closestColor) {
+    coordinates = coordinates.map(coord => Math.round(coord));
+
+    this._colorDisplay.setSelectedColors(rgbColor, closestColor);
+    this._createSelectionIndicator(...coordinates);
+    URLStateManager.serializeSelectionToFragment(coordinates);
   }
 
   /**
@@ -47,6 +88,7 @@ class ColorSpaceExplorer {
       this._selectionIndicator.remove();
       this._selectionIndicator = null;
       this._colorDisplay.clearColors();
+      URLStateManager.serializeSelectionToFragment(null);
     }
   }
 
@@ -88,6 +130,9 @@ class ColorSpaceExplorer {
       colorSpaceView,
       paletteColors,
       options?.highlightIndex);
+
+    // Serialize state to URL whenever we render
+    URLStateManager.serializeColorSpaceViewToURL(colorSpaceView);
   }
 
   _setupMouseHandlers() {
@@ -98,16 +143,18 @@ class ColorSpaceExplorer {
       return [x, y];
     };
 
+    const deferredSetColors = deferUntilAnimationFrame(
+      this._colorDisplay.setColors.bind(this._colorDisplay));
+
     const setColorForMouseEvent = (event, isSelecting) => {
       const [x, y] = getMouseCoords(event);
 
       const [rgbColor, closestColor] = this._renderer.getColorAt(x, y);
 
       if (isSelecting) {
-        this._colorDisplay.setSelectedColors(rgbColor, closestColor);
-        this._createSelectionIndicator(x, y);
+        this.setSelection([x, y], rgbColor, closestColor);
       } else {
-        this._colorDisplay.setColors(rgbColor, closestColor);
+        deferredSetColors(rgbColor, closestColor);
       }
     };
 
@@ -198,6 +245,96 @@ class ColorSpaceExplorer {
     setTimeout(() => { feedback.remove(); }, 800);
   }
 }
+
+/**
+ * URL serialization utilities
+ */
+class URLStateManager {
+  /**
+   * Serialize ColorSpaceView to URL parameters
+   * @param {ColorSpaceView} colorSpaceView - The view to serialize
+   */
+  static serializeColorSpaceViewToURL(colorSpaceView) {
+    const params = new URLSearchParams();
+    params.set('space', colorSpaceView.colorSpace.getType());
+    params.set(colorSpaceView.currentAxis.key, colorSpaceView.currentValue.toString());
+    const regionsParam = colorSpaceView.showBoundaries ? '&regions' : '';
+
+    const fragment = window.location.hash;
+    const newURL = `${window.location.pathname}?${params.toString()}${regionsParam}${fragment}`;
+
+    window.history.replaceState(null, '', newURL);
+  }
+
+  /**
+   * Serialize selected color coordinates to URL fragment
+   * @param {Array<number>|null} coordinates - Canvas coordinates as [x, y]
+   */
+  static serializeSelectionToFragment(coordinates) {
+    if (!coordinates) {
+      // Clear fragment if no color selected
+      const newURL = `${window.location.pathname}${window.location.search}`;
+      window.history.replaceState(null, '', newURL);
+      return;
+    }
+
+    const fragment = `#${coordinates.join(',')}`;
+    const newURL = `${window.location.pathname}${window.location.search}${fragment}`;
+    window.history.replaceState(null, '', newURL);
+  }
+
+  /**
+   * Deserialize selection coordinates from URL fragment
+   * @returns {Array<number>|null} Canvas coordinates as [x, y] or null if no selection
+   */
+  static deserializeSelectionFromFragment() {
+    const fragment = window.location.hash;
+    if (!fragment || fragment.length <= 1) {
+      return null;
+    }
+
+    // Remove the # and split by comma
+    const coords = fragment.slice(1).split(',').map(s => parseInt(s, 10));
+    if (coords.length !== 2 || !coords.every(Number.isInteger)) {
+      return null;
+    }
+
+    return coords;
+  }
+
+  /**
+   * Deserialize ColorSpaceView from URL parameters
+   * @returns {ColorSpaceView} ColorSpaceView instance, or a default view if parameters are invalid
+   */
+  static deserializeColorSpaceViewFromURL() {
+    const params = new URLSearchParams(window.location.search);
+
+    // Lookup the color space, or default to the first available.
+    const spaceParam = params.get('space').toUpperCase();
+    const colorSpace = getColorSpaceByType(spaceParam) || getAllColorSpaces()[0];
+
+    // Try to find axis and value by looking for axis keys in the URL parameters
+    // Set defaults to use if we can't find valid parameters
+    let axis = colorSpace.getDefaultAxis();
+    let value = axis.defaultValue;
+
+    for (const availableAxis of colorSpace.getAllAxes()) {
+      const axisValue = params.get(availableAxis.key);
+      if (axisValue !== null) {
+        axis = availableAxis;
+        const valueIsInteger = axisValue.match(/^-?\d+$/);
+        value = valueIsInteger && axis.isValidValue(Number(axisValue))
+          ? axisValue : axis.defaultValue;
+        break;
+      }
+    }
+
+    const showBoundaries = params.has('regions');
+
+    return new ColorSpaceView(colorSpace, axis, value, showBoundaries);
+  }
+}
+
 
 // Initialize the application when DOM is loaded
 document.addEventListener('DOMContentLoaded', async () => {

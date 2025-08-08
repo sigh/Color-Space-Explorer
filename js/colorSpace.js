@@ -20,6 +20,16 @@ export class Axis {
 
     Object.freeze(this);
   }
+
+  /**
+   * Check if a value is valid for this axis
+   * @param {number} value
+   * @returns {boolean}
+   */
+  isValidValue(value) {
+    // Check if value is within the valid range for this axis
+    return Number.isInteger(value) && value >= this.min && value <= this.max;
+  }
 }
 
 /**
