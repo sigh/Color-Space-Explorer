@@ -458,34 +458,75 @@ h3 {
 /* Selection indicator */
 .selection-indicator {
   position: absolute;
+  /* Center the indicator on the click point */
+  transform: translate(-50%, -50%);
+}
+
+.selection-indicator::before {
+  content: '';
   width: 16px;
   height: 16px;
   border: 2px solid #ffffff;
   border-radius: 50%;
   box-shadow: 0 0 4px rgba(0, 0, 0, 0.5), 0 0 0 1px rgba(0, 0, 0, 0.3);
-  cursor: crosshair;
+  display: flex;
   z-index: 1000;
   animation: selectionPulse .5s ease-in-out;
-
-  /* Center the indicator on the click point */
-  transform: translate(-50%, -50%);
 }
 
 @keyframes selectionPulse {
 
   0% {
-    transform: translate(-50%, -50%) scale(0);
+    transform: scale(0);
     opacity: 0;
   }
 
   25%,
   100% {
-    transform: translate(-50%, -50%) scale(1);
+    transform: scale(1);
     opacity: 1;
   }
 
   50% {
-    transform: translate(-50%, -50%) scale(1.2);
+    transform: scale(1.2);
+  }
+}
+
+/* Add feedback for command-click */
+.add-feedback {
+  position: absolute;
+  /* Center the indicator on the click point */
+  transform: translate(-50%, -50%);
+}
+
+.add-feedback::before {
+  content: "+";
+  width: 24px;
+  height: 24px;
+  background: var(--add-btn-bg);
+  color: var(--text-primary);
+  border: 0.5px solid var(--border-default);
+  border-radius: 50%;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  animation: addFeedback 0.8s ease-out;
+}
+
+@keyframes addFeedback {
+  0% {
+    transform: scale(0);
+    opacity: 1;
+  }
+
+  30% {
+    transform: scale(1.2);
+    opacity: 1;
+  }
+
+  100% {
+    transform: scale(0.8);
+    opacity: 0;
   }
 }
 

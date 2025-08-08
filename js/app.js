@@ -91,10 +91,15 @@ class ColorSpaceExplorer {
   }
 
   _setupMouseHandlers() {
-    const setColorForMouseEvent = (event, isSelecting) => {
+    const getMouseCoords = (event) => {
       const rect = this._canvasContainer.getBoundingClientRect();
       const x = event.clientX - rect.left;
       const y = event.clientY - rect.top;
+      return [x, y];
+    };
+
+    const setColorForMouseEvent = (event, isSelecting) => {
+      const [x, y] = getMouseCoords(event);
 
       const [rgbColor, closestColor] = this._renderer.getColorAt(x, y);
 
@@ -128,9 +133,26 @@ class ColorSpaceExplorer {
       const selectionClicked = event.target === this._selectionIndicator;
       const canvasClicked = this._canvasContainer.contains(event.target);
 
-      this._clearSelection();
-      if (!canvasClicked) return;
+      if (!canvasClicked) {
+        this._clearSelection();
+        return;
+      }
 
+      // Handle command-click (or ctrl-click on Windows) for direct color addition
+      if ((event.metaKey || event.ctrlKey)) {
+        const [x, y] = getMouseCoords(event);
+        const [rgbColor, closestColor] = this._renderer.getColorAt(x, y);
+
+        // Directly add color to palette without going through color display
+        const success = this._colorPalette.addColor(rgbColor, closestColor);
+        if (success) {
+          // Show brief visual feedback at click location
+          this._showAddFeedback(x, y);
+        }
+        return; // Don't proceed with normal click handling
+      }
+
+      this._clearSelection();
       setColorForMouseEvent(event, !selectionClicked);
     });
   }
@@ -153,6 +175,27 @@ class ColorSpaceExplorer {
 
     // Append to canvas container
     this._canvasContainer.appendChild(this._selectionIndicator);
+  }
+
+  /**
+   * Show brief visual feedback when a color is added via command-click
+   * @param {number} x - X coordinate relative to canvas
+   * @param {number} y - Y coordinate relative to canvas
+   */
+  _showAddFeedback(x, y) {
+    // Create feedback element
+    const feedback = document.createElement('div');
+    feedback.className = 'add-feedback';
+
+    // Position absolutely within the canvas container
+    feedback.style.left = `${x}px`;
+    feedback.style.top = `${y}px`;
+
+    // Append to canvas container
+    this._canvasContainer.appendChild(feedback);
+
+    // Remove after animation completes
+    setTimeout(() => { feedback.remove(); }, 800);
   }
 }
 

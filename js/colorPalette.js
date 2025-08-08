@@ -125,7 +125,7 @@ export class ColorPalette {
     this._addButton.className = 'add-color-btn';
     this._addButton.style.visibility = 'hidden'; // Hidden but takes up space
     this._addButton.addEventListener('click', () => {
-      this._handleAddColor();
+      this.addColor(...this._colorDisplay.getSelectedColors());
     });
     this._colorCount.appendChild(this._addButton);
 
@@ -188,19 +188,24 @@ export class ColorPalette {
   }
 
   /**
-   * Add a new color to the palette
-   * @param {string} name - The name of the color
-   * @param {RgbColor} color - RGB color instance
+   * Add a color with automatic naming
+   * @param {RgbColor} rgbColor - RGB color instance
+   * @param {NamedColor|null} closestColor - Closest color for naming
+   * @returns {boolean} True if added, false if at limit
    */
-  addColor(name, color) {
-    const newColor = new NamedColor(name, color);
-    this._colors.unshift(newColor); // Add to beginning
+  addColor(rgbColor, closestColor) {
+    if (!rgbColor) return false;
+    if (this._colors.length >= MAX_PALETTE_COLORS) return false;
+
+    const name = this._generateColorName(rgbColor, closestColor);
+
+    this._colors.unshift(new NamedColor(name, rgbColor));
     this._renderColors();
     this._onUpdate();
-
-    // Scroll the new color into view
     this._colorList.firstChild.scrollIntoView(
       { behavior: 'smooth', block: 'start' });
+
+    return true;
   }
 
   /**
@@ -217,22 +222,6 @@ export class ColorPalette {
     // Button is enabled when there's a selection AND we're not at the limit
     const isEnabled = hasSelection && !isAtLimit;
     this._addButton.disabled = !isEnabled;
-  }
-
-  /**
-   * Handle adding the currently selected color
-   */
-  _handleAddColor() {
-    // Check if we're at the limit
-    if (this._colors.length >= MAX_PALETTE_COLORS) {
-      return; // Don't add if at limit
-    }
-
-    const [selectedColor, closestColor] = this._colorDisplay.getSelectedColors();
-    if (selectedColor) {
-      const colorName = this._generateColorName(selectedColor, closestColor);
-      this.addColor(colorName, selectedColor);
-    }
   }
 
   /**
