@@ -318,12 +318,8 @@ export class ColorPalette {
     const hasSelection = !!selectedColor;
     const isAtLimit = this._colors.length >= MAX_PALETTE_COLORS;
 
-    // Button is visible when there's a selection
-    this._addButton.style.visibility = hasSelection ? 'visible' : 'hidden';
-
-    // Button is enabled when there's a selection AND we're not at the limit
     const isEnabled = hasSelection && !isAtLimit;
-    this._addButton.disabled = !isEnabled;
+    this._addButton.style.visibility = isEnabled ? 'visible' : 'hidden';
   }
 
   /**

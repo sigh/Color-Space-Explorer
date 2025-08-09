@@ -267,20 +267,6 @@ h3 {
   color: var(--text-danger);
 }
 
-.add-color-btn:disabled,
-.add-color-btn.disabled {
-  background: var(--bg-surface);
-  color: var(--text-muted);
-  cursor: not-allowed;
-  opacity: 0.6;
-}
-
-.add-color-btn:hover:disabled,
-.add-color-btn:hover.disabled {
-  background: var(--bg-surface);
-  color: var(--text-muted);
-}
-
 /* Form controls */
 .slider-container {
   display: flex;
@@ -299,7 +285,7 @@ h3 {
   appearance: none;
 }
 
-.slider-value {
+.axis-slider-value {
   color: var(--text-secondary);
   font-family: var(--font-mono);
   font-size: 12px;

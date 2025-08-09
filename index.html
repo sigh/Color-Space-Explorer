@@ -26,24 +26,24 @@
         </div>
         <div class="control-group">
           <label for="axisSlider" class="control-label">
-            <span id="axisLabel">Hue</span>
+            <span class="axis-label">Hue</span>
           </label>
           <div class="slider-container">
-            <input type="range" id="axisSlider" class="value-slider" min="0" max="360" value="180" step="1">
-            <span class="slider-value" id="axisValue">180°</span>
+            <input type="range" class="axis-slider value-slider" id="axisSlider">
+            <span class="axis-slider-value">180°</span>
           </div>
         </div>
 
         <div class="control-group">
           <label class="control-label">
-            <input type="checkbox" id="boundariesToggle" class="toggle-checkbox" checked>
+            <input type="checkbox" class="boundaries-toggle toggle-checkbox" checked>
             <span class="toggle-label">Region Boundaries</span>
           </label>
         </div>
 
         <div class="control-group" style="visibility: hidden;">
           <label class="control-label polar-toggle-group">
-            <input type="checkbox" id="polarToggle" class="toggle-checkbox">
+            <input type="checkbox" class="polar-toggle toggle-checkbox">
             <span class="toggle-label">Polar Coordinates</span>
           </label>
         </div>
@@ -61,7 +61,7 @@
     <!-- Right Panel - Palette -->
     <div class="palette-panel">
       <div class="color-display-section panel-section">
-        <h2 class="color-info-title">Color</h2>
+        <h2 class="color-info-title">No Color</h2>
         <div class="color-info color-item">
           <div class="color-swatch"></div>
           <div class="color-values">

@@ -33,6 +33,7 @@ class ColorSpaceExplorer {
     const initialColorSpaceView = URLStateManager.deserializeColorSpaceViewFromURL();
 
     this._uiController = new UIController(
+      document.querySelector('.control-panel'),
       initialColorSpaceView, (options) => {
         this._clearSelection();  // Clear selection on color space change
         this._deferredUpdateRenderer(options);
@@ -119,13 +120,6 @@ class ColorSpaceExplorer {
       return [x, y];
     };
 
-    const deferredSetColors = deferUntilAnimationFrame((...colors) => {
-      if (!this._selectionIndicator) {
-        // Ensure nothing was selected in the meantime.
-        this._colorDisplay.setColors(...colors);
-      }
-    });
-
     // Mouse move handler for hover effect
     this._canvasContainer.addEventListener('mousemove', (event) => {
       // Skip hover updates if there's a selection
@@ -139,7 +133,7 @@ class ColorSpaceExplorer {
         return;
       }
 
-      deferredSetColors(rgbColor, closestColor);
+      this._colorDisplay.setColors(rgbColor, closestColor);
     });
 
     // Mouse leave handler to reset to default
@@ -177,7 +171,7 @@ class ColorSpaceExplorer {
       if (!selectionClicked) {
         this.setSelection([x, y], rgbColor, closestColor);
       } else {
-        deferredSetColors(rgbColor, closestColor);
+        this._colorDisplay.setColors(rgbColor, closestColor);
       }
     });
   }

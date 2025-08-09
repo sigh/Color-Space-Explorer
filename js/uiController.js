@@ -5,17 +5,18 @@ import { ColorSpaceView, getAllColorSpaces } from './colorSpace.js';
  * UI controller for handling axis controls and boundaries toggle
  */
 export class UIController {
-  constructor(initialColorSpaceView, onColorSpaceChange) {
+  constructor(container, initialColorSpaceView, onColorSpaceChange) {
     // Axis control elements
-    this._axisSlider = document.getElementById('axisSlider');
-    this._axisValue = document.getElementById('axisValue');
-    this._axisLabel = document.getElementById('axisLabel');
+    this._axisSlider = container.querySelector('.axis-slider');
+    this._axisValue = container.querySelector('.axis-slider-value');
+    this._axisLabel = container.querySelector('.axis-label');
+    this._axisSelector = container.querySelector('.axis-selector');
 
     // Boundaries toggle element
-    this._boundariesToggle = document.getElementById('boundariesToggle');
+    this._boundariesToggle = container.querySelector('.boundaries-toggle');
 
     // Polar coordinates toggle element
-    this._polarToggle = document.getElementById('polarToggle');
+    this._polarToggle = container.querySelector('.polar-toggle');
 
     // Callback
     this._onColorViewUpdate = onColorSpaceChange;
@@ -29,38 +30,40 @@ export class UIController {
       this._onColorViewUpdate();
     });
 
-    this._setupColorSpaceControls(initialColorSpaceView.colorSpace);
+    this._setupColorSpaceControls(container, initialColorSpaceView);
 
     // Set the current state from the view
-    this._selectAxis(initialColorSpaceView.currentAxis);
     this._axisSlider.value = initialColorSpaceView.currentValue;
-    this._updateSliderLabel(initialColorSpaceView);
+    this._updateSliderLabel(
+      initialColorSpaceView.currentAxis, initialColorSpaceView.currentValue);
     this._boundariesToggle.checked = initialColorSpaceView.showBoundaries;
     this._polarToggle.checked = initialColorSpaceView.usePolarCoordinates;
   }
 
   /**
    * Initialize color space controls
-   * @param {ColorSpace} initialColorSpace - Initial color space
+   * @param {ColorSpace} initialColorSpaceView - Initial color space
+   * @param {HTMLElement} container - Container element for controls
    */
-  _setupColorSpaceControls(initialColorSpace) {
+  _setupColorSpaceControls(container, initialColorSpaceView) {
     // Set up slider event listener
-    this._axisSlider.addEventListener('input', () => {
-      const colorSpaceView = this.getCurrentColorSpaceView();
-      this._updateSliderLabel(colorSpaceView);
+    this._axisSlider.addEventListener('input', (event) => {
+      this._updateSliderLabel(this._currentAxis, event.target.value);
       this._onColorViewUpdate();
     });
 
-    this._setupColorSpaceButtons(initialColorSpace);
-    this._selectColorSpace(initialColorSpace);
+    this._setupColorSpaceButtons(container, initialColorSpaceView.colorSpace);
+    this._selectColorSpace(
+      initialColorSpaceView.colorSpace, initialColorSpaceView.currentAxis);
   }
 
   /**
    * Update the color space buttons based on available color spaces
    * @param {ColorSpace} colorSpace - The currently selected color space
+   * @param {HTMLElement} container - Container element for controls
    */
-  _setupColorSpaceButtons(colorSpace) {
-    const colorSpaceSelector = document.querySelector('.color-space-selector');
+  _setupColorSpaceButtons(container, colorSpace) {
+    const colorSpaceSelector = container.querySelector('.color-space-selector');
     clearElement(colorSpaceSelector);
 
     getAllColorSpaces().forEach((cs) => {
@@ -92,13 +95,13 @@ export class UIController {
 
   /**
    * Update the axis buttons based on the current color space
+   * @param {ColorSpace} colorSpace - The currently selected color space
+   * @param {Axis} initialAxis - The default axis for the color space
    */
-  _updateAxisButtons() {
-    const axisSelector = document.querySelector('.axis-selector');
-    clearElement(axisSelector); // Clear existing buttons
+  _updateAxisButtons(colorSpace, initialAxis) {
+    clearElement(this._axisSelector); // Clear existing buttons
 
-    const axes = this._colorSpace.getAllAxes();
-    const defaultAxis = this._colorSpace.getDefaultAxis();
+    const axes = colorSpace.getAllAxes();
 
     axes.forEach((axis) => {
       const label = createElement('label');
@@ -110,7 +113,7 @@ export class UIController {
       radio.value = axis.key;
 
       // Make the default axis checked by default
-      if (axis === defaultAxis) {
+      if (axis === initialAxis) {
         radio.checked = true;
       }
 
@@ -118,29 +121,30 @@ export class UIController {
 
       label.appendChild(radio);
       label.appendChild(span);
-      axisSelector.appendChild(label);
+      this._axisSelector.appendChild(label);
 
       // Attach event listener directly
       radio.addEventListener('change', () => {
         this._selectAxis(axis);
       });
     });
+
+    this._selectAxis(initialAxis);
   }
 
   /**
    * Select a new color space type
    * @param {ColorSpace} colorSpace - Color space to select
+   * @param {Axis} [axis] - Optional axis to select, defaults to the color space's default axis
    */
-  _selectColorSpace(colorSpace) {
+  _selectColorSpace(colorSpace, axis) {
     // Update color space
     this._colorSpace = colorSpace;
 
-    // Update axis buttons for the new color space
-    this._updateAxisButtons();
+    axis ||= colorSpace.getDefaultAxis();
 
-    // Reset to default axis
-    const defaultAxis = this._colorSpace.getDefaultAxis();
-    this._selectAxis(defaultAxis);
+    // Update axis buttons for the new color space
+    this._updateAxisButtons(colorSpace, axis);
   }
 
   /**
@@ -155,10 +159,7 @@ export class UIController {
     this._axisSlider.max = axis.max;
     this._axisSlider.value = axis.defaultValue;
 
-    const colorSpaceView = this.getCurrentColorSpaceView();
-
-    // Update display
-    this._updateSliderLabel(colorSpaceView);
+    this._updateSliderLabel(axis, axis.defaultValue);
 
     // Update polar toggle visibility
     this._updatePolarToggleVisibility();
@@ -173,23 +174,16 @@ export class UIController {
   _updatePolarToggleVisibility() {
     const polarAxis = this._colorSpace.availablePolarAxis(this._currentAxis);
     this._polarToggle.parentNode.style.visibility = polarAxis ? 'visible' : 'hidden';
-
-    // Reset polar toggle to false if it's not available
-    if (!polarAxis) {
-      this._polarToggle.checked = false;
-    }
   }
 
   /**
    * Update slider labels
-   * @param {ColorSpaceView} colorSpaceView - Color space view to display
+   * @param {Axis} axis - The axis being updated
+   * @param {number} value - The current value of the axis
    */
-  _updateSliderLabel(colorSpaceView) {
-    const axis = colorSpaceView.currentAxis;
-
-    // Update labels
+  _updateSliderLabel(axis, value) {
     this._axisLabel.textContent = axis.name;
-    this._axisValue.textContent = `${colorSpaceView.currentValue}${axis.unit}`;
+    this._axisValue.textContent = `${value}${axis.unit}`;
   }
 
   /**
