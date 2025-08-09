@@ -314,6 +314,28 @@ export class CanvasRenderer {
   }
 
   /**
+   * Wait for GPU rendering to complete
+   * @returns {Promise<void>} Promise that resolves when all GPU commands are complete
+   */
+  waitForCurrentRender() {
+    const gl = this._gl;
+    const sync = gl.fenceSync(gl.SYNC_GPU_COMMANDS_COMPLETE, 0);
+    return new Promise(resolve => {
+      const checkSync = () => {
+        const status = gl.clientWaitSync(sync, gl.SYNC_FLUSH_COMMANDS_BIT, 0);
+        if (status === gl.ALREADY_SIGNALED || status === gl.CONDITION_SATISFIED) {
+          gl.deleteSync(sync);
+          resolve();
+        } else {
+          // Check again on next frame if not ready
+          requestAnimationFrame(checkSync);
+        }
+      };
+      checkSync();
+    });
+  }
+
+  /**
    * Add polar axis labels and ticks
    * @param {Axis} polarAxis - The polar axis to label
    * @param {string} className - CSS class for the axis ('theta-axis')

@@ -169,7 +169,6 @@ export class ColorPalette {
           this._currentHighlight)?.classList.remove('color-item-highlighted');
       }
       if (closestColor !== null) {
-        console.log(closestColor, this._getElementForColor(closestColor));
         this._getElementForColor(
           closestColor)?.classList.add('color-item-highlighted');
       }
@@ -214,7 +213,7 @@ export class ColorPalette {
     dropdown.addEventListener('change', (event) => {
       this._colors = [...getPreset(event.target.value)];
       this._renderColors();
-      this._onUpdate({ recalculateSelection: true });
+      this._onUpdate();
     });
     return dropdown;
   }
@@ -290,7 +289,7 @@ export class ColorPalette {
       this._colors.splice(index, 1);
       this._setCustomState();
       this._renderColors();
-      this._onUpdate({ recalculateSelection: true });
+      this._onUpdate();
     }
   }
 
@@ -306,7 +305,7 @@ export class ColorPalette {
       this._colors[index] = new NamedColor(newName.trim(), color.rgbColor);
       this._setCustomState();
       this._renderColors();
-      this._onUpdate({ recalculateSelection: true });
+      this._onUpdate();
     }
   }
 
@@ -325,7 +324,7 @@ export class ColorPalette {
     this._colors.unshift(new NamedColor(name, rgbColor));
     this._setCustomState();
     this._renderColors();
-    this._onUpdate({ recalculateSelection: true });
+    this._onUpdate();
 
     // Highlight the newly added item
     const newItem = this._colorList.firstChild;

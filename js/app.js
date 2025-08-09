@@ -34,37 +34,44 @@ class ColorSpaceExplorer {
 
     this._uiController = new UIController(
       document.querySelector('.control-panel'),
-      initialColorSpaceView, (options) => {
-        this._clearSelection();  // Clear selection on color space change
-        this._deferredUpdateRenderer(options);
-      });
+      initialColorSpaceView,
+      this._deferredUpdateRenderer.bind(this));
   }
 
   async init() {
     this._renderer = await CanvasRenderer.create(this._canvasContainer);
+
+    // Create a selection indicator - this will get updated as required.
+    const selectionCoords = URLStateManager.deserializeSelectionFromFragment();
+    if (selectionCoords) {
+      this._placeSelectionIndicator(...selectionCoords);
+    }
+
     this._setupMouseHandlers();
-    this._updateRenderer({ recalculateSelection: true }); // No deferral
+
+    this._updateRenderer(); // No deferral
   }
 
   /**
    * Initialize selection from URL fragment if coordinates are present
    */
-  _maySetSelectionFromURL() {
-    const coordinates = URLStateManager.deserializeSelectionFromFragment();
-    if (coordinates) {
-      // Use requestAnimationFrame to ensure the render is complete
-      requestAnimationFrame(() => {
-        const [x, y] = coordinates;
+  async _recalculateSelection() {
+    if (!this._selectionIndicator) return;
 
-        const [rgbColor, closestColor] = this._renderer.getColorAt(x, y);
+    // Use requestAnimationFrame to ensure the render is complete
+    await this._renderer.waitForCurrentRender();
 
-        // Set as selected if we have a valid color, otherwise clear selection
-        if (rgbColor !== null) {
-          this.setSelection(coordinates, rgbColor, closestColor);
-        } else {
-          this._clearSelection();
-        }
-      });
+    // Check that we still have a selection indicator after waiting
+    if (!this._selectionIndicator) return;
+    const coordinates = this._selectionIndicator.dataset.coordinates?.split(',').map(Number);
+
+    const [rgbColor, closestColor] = this._renderer.getColorAt(...coordinates);
+
+    // Set as selected if we have a valid color, otherwise clear selection
+    if (rgbColor !== null) {
+      this._setSelection(coordinates, rgbColor, closestColor);
+    } else {
+      this._clearSelection();
     }
   }
 
@@ -74,10 +81,8 @@ class ColorSpaceExplorer {
    * @param {Array<number>} rgbColor - RGB color value as [r, g, b]
    * @param {Array<number>} closestColor - Closest color value as [r, g, b]
    */
-  setSelection(coordinates, rgbColor, closestColor) {
-    coordinates = coordinates.map(coord => Math.round(coord));
-
-    this._createSelectionIndicator(...coordinates);
+  _setSelection(coordinates, rgbColor, closestColor) {
+    this._placeSelectionIndicator(...coordinates);
     this._colorDisplay.setSelectedColors(rgbColor, closestColor);
     URLStateManager.serializeSelectionToFragment(coordinates);
   }
@@ -106,9 +111,7 @@ class ColorSpaceExplorer {
     // Serialize state to URL whenever we render
     URLStateManager.serializeColorSpaceViewToURL(colorSpaceView);
 
-    if (options?.recalculateSelection) {
-      this._maySetSelectionFromURL();
-    }
+    this._recalculateSelection();
   }
 
   _setupMouseHandlers() {
@@ -168,7 +171,7 @@ class ColorSpaceExplorer {
       }
 
       if (!selectionClicked) {
-        this.setSelection([x, y], rgbColor, closestColor);
+        this._setSelection([x, y], rgbColor, closestColor);
       } else {
         this._colorDisplay.setColors(rgbColor, closestColor);
       }
@@ -180,19 +183,25 @@ class ColorSpaceExplorer {
    * @param {number} x - X coordinate relative to canvas
    * @param {number} y - Y coordinate relative to canvas
    */
-  _createSelectionIndicator(x, y) {
-    this._selectionIndicator?.remove();
+  _placeSelectionIndicator(x, y) {
+    if (!this._selectionIndicator) {
+      // Create indicator element positioned absolutely within canvas container
+      this._selectionIndicator = document.createElement('div');
+      this._selectionIndicator.className = 'selection-indicator';
 
-    // Create indicator element positioned absolutely within canvas container
-    this._selectionIndicator = document.createElement('div');
-    this._selectionIndicator.className = 'selection-indicator';
+      // Append to canvas container
+      this._canvasContainer.appendChild(this._selectionIndicator);
+    }
+
+    x = Math.round(x);
+    y = Math.round(y);
 
     // Position absolutely within the canvas container (CSS handles centering)
     this._selectionIndicator.style.left = `${x}px`;
     this._selectionIndicator.style.top = `${y}px`;
 
-    // Append to canvas container
-    this._canvasContainer.appendChild(this._selectionIndicator);
+    // Store the coordinates in the data attribute
+    this._selectionIndicator.dataset.coordinates = `${x},${y}`;
   }
 
   /**

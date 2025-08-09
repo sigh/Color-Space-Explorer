@@ -42,7 +42,7 @@ export function createElement(tagName, textContent = '') {
  * @param {Function} fn - Function to defer
  * @returns {Function} Deferred function
  */
-export const deferUntilAnimationFrame = (fn) => {
+export function deferUntilAnimationFrame(fn) {
   let lastArgs = null;
   let promise = null;
   let alreadyEnqueued = false;
@@ -67,4 +67,4 @@ export const deferUntilAnimationFrame = (fn) => {
 
     return promise;
   });
-};
+}
