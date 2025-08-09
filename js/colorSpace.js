@@ -123,8 +123,8 @@ export const RgbColorSpace = Object.freeze(new ColorSpace('RGB', [
  */
 export const HsvColorSpace = Object.freeze(new ColorSpace('HSV', [
   new Axis('hue', '°', 360, 180),
-  new Axis('saturation', '%', 100, 50),
-  new Axis('value', '%', 100, 75)
+  new Axis('saturation', '%', 100, 100),
+  new Axis('value', '%', 100, 100)
 ], 'saturation'));
 
 /**
@@ -132,7 +132,7 @@ export const HsvColorSpace = Object.freeze(new ColorSpace('HSV', [
  */
 export const HslColorSpace = Object.freeze(new ColorSpace('HSL', [
   new Axis('hue', '°', 360, 180),
-  new Axis('saturation', '%', 100, 50),
+  new Axis('saturation', '%', 100, 100),
   new Axis('lightness', '%', 100, 50)
 ], 'saturation'));
 

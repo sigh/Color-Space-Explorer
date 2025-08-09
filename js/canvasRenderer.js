@@ -1,4 +1,5 @@
 import { getAllColorSpaces, RgbColor } from "./colorSpace.js";
+import { clearElement, createElement } from "./utils.js";
 
 /**
  * WebGL2 Canvas renderer for color spaces with framebuffer rendering
@@ -15,6 +16,11 @@ export class CanvasRenderer {
     this._width = canvas.width;
     this._height = canvas.height;
     this._paletteColors = []; // The palette colors used for indexing.
+
+    // Create axis container for labels and tick marks
+    this._axisContainer = document.createElement('div');
+    this._axisContainer.className = 'axis-container';
+    canvasContainer.appendChild(this._axisContainer);
 
     this._initWebGL(vertexShaderSource, computeFragmentShaderSource, renderFragmentShaderSource);
   }
@@ -187,6 +193,9 @@ export class CanvasRenderer {
 
     // Render phase: Render framebuffer texture to canvas
     this._renderPhase(colorSpaceView.showBoundaries, highlightPaletteIndex);
+
+    // Update axis labels for the current color space view
+    this._updateAxisLabels(colorSpaceView);
   }
 
   /**
@@ -259,6 +268,70 @@ export class CanvasRenderer {
 
     // Draw
     gl.drawArrays(gl.TRIANGLE_STRIP, 0, 4);
+  }
+
+  /**
+   * Update axis labels and tick marks for the current color space view
+   * @param {ColorSpaceView} colorSpaceView - Current color space view
+   */
+  _updateAxisLabels(colorSpaceView) {
+    // Clear existing labels by emptying the axis container
+    clearElement(this._axisContainer);
+
+    const colorSpace = colorSpaceView.colorSpace;
+    const axes = colorSpace.getAllAxes();
+    const currentAxisIndex = colorSpace.getAxisIndex(colorSpaceView.currentAxis);
+
+    // Get the two variable axes (non-fixed)
+    const variableAxes = axes.filter((_, index) => index !== currentAxisIndex);
+
+    if (variableAxes.length !== 2) return; // Should always be 2 for a 2D canvas
+
+    // X-axis (bottom) - first variable axis
+    this._createAxisLabelAndTicks(variableAxes[0], 'x-axis');
+
+    // Y-axis (left) - second variable axis
+    this._createAxisLabelAndTicks(variableAxes[1], 'y-axis');
+  }
+
+  /**
+   * Create axis label and ticks
+   * @param {Axis} axis
+   * @param {string} className - CSS class ('x-axis' or 'y-axis')
+   */
+  _createAxisLabelAndTicks(axis, className) {
+    const label = createElement('div', axis.name);
+    label.className = `axis-label ${className}`;
+    this._axisContainer.appendChild(label);
+
+    // Add tick marks at intervals of 0.2 from 0.0 to 1.0
+    const numIntervals = 5;
+    for (let i = 0; i <= numIntervals; i++) {
+      this._axisContainer.appendChild(
+        this._createTick(i / numIntervals, axis, className));
+    }
+  }
+
+  /**
+   * Creates an individual tick mark element for an axis and appends it to the axis container.
+   *
+   * @private
+   * @param {string} scaledPosition - Position along the axis (0.0 to 1.0)
+   * @param {Axis} axis - The axis object containing min, max, and unit properties.
+   * @param {string} axisClass - The CSS class for the tick mark ('x-axis' or 'y-axis').
+   * @returns {HTMLElement} The created tick mark element.
+   */
+  _createTick(scaledPosition, axis, axisClass) {
+    const value = Math.round(scaledPosition * axis.max);
+    const tick = createElement('div', `${value}${axis.unit}`);
+    tick.className = `tick-mark ${axisClass}`;
+
+    if (axisClass === 'x-axis') {
+      tick.style.left = `${Math.round(scaledPosition * this._width)}px`;
+    } else {
+      tick.style.top = `${Math.round((1 - scaledPosition) * this._height)}px`;
+    }
+    return tick;
   }
 
   /**
