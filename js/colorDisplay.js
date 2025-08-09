@@ -20,6 +20,7 @@ export class ColorDisplay {
 
     // Closest color display element within the container
     this._closestColorContainer = container.querySelector('.closest-color-container');
+    this._setClosestColor(null);
 
     // Set default state
     this.clearColors();

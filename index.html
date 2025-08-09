@@ -12,7 +12,7 @@
   <div class="app-container">
     <!-- Left Panel - Controls -->
     <div class="control-panel">
-      <section class="control-section">
+      <div class="panel-section">
         <h2>Color Space</h2>
         <div class="control-group">
           <label class="control-label">Color Space Type</label>
@@ -47,33 +47,7 @@
             <span class="toggle-label">Polar Coordinates</span>
           </label>
         </div>
-      </section>
-
-      <section class="color-display-section">
-        <div class="control-section">
-          <h2 class="color-info-title">Color</h2>
-          <div class="color-info">
-            <div class="color-swatch"></div>
-            <div class="color-values">
-              <div class="color-value">
-                <span class="color-data rgb-data"></span>
-              </div>
-              <div class="color-value">
-                <span class="color-data hsl-data"></span>
-              </div>
-              <div class="color-value">
-                <span class="color-data hsv-data"></span>
-              </div>
-            </div>
-          </div>
-        </div>
-
-        <div class="control-section">
-          <h3>Closest Color</h3>
-          <div class="closest-color-container">
-          </div>
-        </div>
-      </section>
+      </div>
     </div>
 
     <!-- Center Panel - Canvas -->
@@ -86,6 +60,34 @@
 
     <!-- Right Panel - Palette -->
     <div class="palette-panel">
+      <div class="color-display-section panel-section">
+        <h2 class="color-info-title">Color</h2>
+        <div class="color-info color-item">
+          <div class="color-swatch"></div>
+          <div class="color-values">
+            <div class="color-value">
+              <span class="color-data rgb-data"></span>
+            </div>
+            <div class="color-value">
+              <span class="color-data hsl-data"></span>
+            </div>
+            <div class="color-value">
+              <span class="color-data hsv-data"></span>
+            </div>
+          </div>
+          <button class="add-color-btn" title="Add selected color to palette">
+            +
+          </button>
+        </div>
+
+        <div>
+          <h3>Closest Color</h3>
+          <div class="closest-color-container">
+          </div>
+        </div>
+      </div>
+
+      <div class="palette-section panel-section"></div>
     </div>
   </div>
 

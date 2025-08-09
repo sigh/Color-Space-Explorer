@@ -19,9 +19,11 @@ class ColorSpaceExplorer {
     const colorDisplayContainer = document.querySelector('.color-display-section');
     this._colorDisplay = new ColorDisplay(colorDisplayContainer);
 
-    const paletteContainer = document.querySelector('.palette-panel');
+    const paletteContainer = document.querySelector('.palette-section');
+    const addButton = document.querySelector('.add-color-btn');
     this._colorPalette = new ColorPalette(
       paletteContainer,
+      addButton,
       this._colorDisplay,
       // Don't defer palette updates, as they have arguments which shouldn't
       // get overridden by later calls.

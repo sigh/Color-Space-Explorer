@@ -70,18 +70,25 @@ body {
 .palette-panel {
   padding: 20px;
   background: var(--bg-panel);
-  overflow-y: auto;
   display: flex;
+  gap: 24px;
   flex-direction: column;
 }
 
 .control-panel {
   border-right: 1px solid var(--border-default);
+  overflow-y: auto;
 }
 
 .palette-panel {
   border-left: 1px solid var(--border-default);
   overflow-y: hidden;
+}
+
+.panel-section {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
 }
 
 .canvas-panel {
@@ -93,8 +100,7 @@ body {
 }
 
 /* Common heading styles */
-.control-section h2,
-.palette-panel h2,
+h2,
 .app-title {
   color: var(--text-primary);
   font-weight: 500;
@@ -102,10 +108,8 @@ body {
   letter-spacing: 0.05em;
 }
 
-.control-section h2,
-.palette-panel h2 {
+h2 {
   font-size: 14px;
-  margin-bottom: 12px;
 }
 
 .app-title {
@@ -134,20 +138,10 @@ h3 {
   margin-bottom: 8px;
 }
 
-/* Common spacing */
-.control-section {
-  margin-bottom: 24px;
-}
-
-.control-group {
-  margin-bottom: 16px;
-}
-
 /* Common interactive elements */
 .segmented-control,
 .palette-dropdown,
-.color-item,
-.color-info {
+.color-item {
   background: var(--bg-surface);
   border: 1px solid var(--bg-surface-hover);
   border-radius: var(--radius-surface);
@@ -164,7 +158,6 @@ h3 {
   color: var(--text-secondary);
   font-size: 12px;
   padding: 8px 12px;
-  margin-bottom: 16px;
   cursor: pointer;
   outline: none;
 }
@@ -178,9 +171,8 @@ h3 {
 }
 
 .color-item {
-  position: relative;
   display: flex;
-  align-items: flex-start;
+  align-items: center;
   gap: 12px;
   padding: 4px;
 }
@@ -201,13 +193,6 @@ h3 {
   100% {
     box-shadow: inset 0 0 0px var(--add-action);
   }
-}
-
-.color-info {
-  display: flex;
-  align-items: center;
-  gap: 12px;
-  padding: 12px;
 }
 
 /* Button styles */
@@ -238,6 +223,11 @@ h3 {
 .add-color-btn {
   background: var(--add-action);
   color: var(--text-primary);
+  visibility: hidden;
+  padding: 0px;
+  font-size: 18px;
+  width: 24px;
+  height: 24px;
 }
 
 .radio-button input {
@@ -328,7 +318,6 @@ h3 {
   gap: 8px;
   cursor: pointer;
   margin-bottom: 0;
-  padding: 8px 0;
   position: relative;
 }
 
@@ -384,8 +373,8 @@ h3 {
 
 /* Color elements */
 .color-swatch {
-  width: 40px;
-  height: 40px;
+  width: 32px;
+  height: 32px;
   border-radius: var(--radius-button);
   border: 1px solid var(--bg-surface-hover);
   flex-shrink: 0;
@@ -415,15 +404,11 @@ h3 {
   transition: opacity 0.2s ease;
 }
 
-.color-item .color-swatch {
-  width: 32px;
-  height: 32px;
-}
-
 .color-values {
   color: var(--text-muted);
   font-family: var(--font-mono);
   font-size: 11px;
+  flex: 1;
 }
 
 .color-value {
@@ -461,12 +446,12 @@ h3 {
   outline-offset: 2px;
 }
 
-.color-add-container {
+.palette-select-container {
   font-size: 12px;
   display: flex;
   justify-content: space-between;
   align-items: center;
-  margin: 8px 0;
+  text-align: center;
 }
 
 .count-current {
@@ -477,13 +462,21 @@ h3 {
   color: var(--text-muted);
 }
 
-/* Utility classes */
-.color-list {
+.palette-section {
+  /* Required so palette-color-list can scroll */
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+  min-height: 0;
+}
+
+.palette-color-list {
   display: flex;
   flex-direction: column;
   gap: 4px;
   overflow-y: auto;
   flex: 1;
+  min-height: 0;
 }
 
 .canvas-container {

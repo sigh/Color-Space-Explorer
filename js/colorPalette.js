@@ -101,12 +101,12 @@ function _setupNameEditing(nameElement, color, onNameEdit) {
  * Manages the color palette display and functionality
  */
 export class ColorPalette {
-  constructor(container, colorDisplay, onUpdate = null) {
+  constructor(container, addButton, colorDisplay, onUpdate = null) {
     this._colors = [];
     this.container = container;
     this._colorList = null;
     this._dropdown = null;
-    this._addButton = null;
+    this._addButton = addButton;
     this._colorDisplay = colorDisplay;
     this._onUpdate = onUpdate || (() => { });
     this._initializeUI();
@@ -128,7 +128,39 @@ export class ColorPalette {
     const title = createElement('h2', 'Color Palette');
     this.container.appendChild(title);
 
+    // Create container for dropdown and color count
+    const paletteSelectContainer = createElement('div');
+    paletteSelectContainer.className = 'palette-select-container';
+
     // Create preset dropdown
+    const dropdown = this._makePaletteSelectDropdown();
+    paletteSelectContainer.appendChild(dropdown);
+    this._colors = [...getPreset(dropdown.value)];
+
+    // Create color count display
+    paletteSelectContainer.appendChild(this._makeCountDisplay());
+
+    this.container.appendChild(paletteSelectContainer);
+
+    // Create Add button
+    this._addButton.style.visibility = 'hidden'; // Hidden but takes up space
+    this._addButton.addEventListener('click', () => {
+      this.addColor(...this._colorDisplay.getSelectedColors());
+    });
+
+    // Create scrollable color list container
+    this._colorList = createElement('div');
+    this._colorList.className = 'palette-color-list';
+    this.container.appendChild(this._colorList);
+
+    this._renderColors();
+  }
+
+  /**
+   * Create the palette select dropdown
+   * @returns {HTMLElement} The dropdown element for selecting color palettes
+   */
+  _makePaletteSelectDropdown() {
     const dropdown = createElement('select');
     dropdown.className = 'palette-dropdown';
     this._dropdown = dropdown;
@@ -152,22 +184,15 @@ export class ColorPalette {
       this._renderColors();
       this._onUpdate({ recalculateSelection: true });
     });
+    return dropdown;
+  }
 
-    this.container.appendChild(dropdown);
+  /**
+   * Creates the color count display element
+   * @returns {HTMLElement} The count display element
+   */
 
-    // Create color count display with inline Add button
-    const colorAddContainer = createElement('div');
-    colorAddContainer.className = 'color-add-container';
-
-    // Create Add button (positioned first, to the left)
-    this._addButton = createElement('button', 'Add selected color');
-    this._addButton.className = 'add-color-btn';
-    this._addButton.style.visibility = 'hidden'; // Hidden but takes up space
-    this._addButton.addEventListener('click', () => {
-      this.addColor(...this._colorDisplay.getSelectedColors());
-    });
-    colorAddContainer.appendChild(this._addButton);
-
+  _makeCountDisplay() {
     const countTextContainer = createElement('div');
     {
       const currentCount = createElement('div');
@@ -179,17 +204,7 @@ export class ColorPalette {
       maxCount.className = 'count-max';
       countTextContainer.appendChild(maxCount);
     }
-    colorAddContainer.appendChild(countTextContainer);
-
-    this.container.appendChild(colorAddContainer);
-
-    // Create scrollable color list container
-    this._colorList = createElement('div');
-    this._colorList.className = 'color-list';
-    this.container.appendChild(this._colorList);
-
-    this._colors = [...getPreset(dropdown.value)];
-    this._renderColors();
+    return countTextContainer;
   }
 
   /**
