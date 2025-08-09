@@ -150,7 +150,7 @@ export class ColorPalette {
     dropdown.addEventListener('change', (event) => {
       this._colors = [...getPreset(event.target.value)];
       this._renderColors();
-      this._onUpdate();
+      this._onUpdate({ recalculateSelection: true });
     });
 
     this.container.appendChild(dropdown);
@@ -205,6 +205,8 @@ export class ColorPalette {
     // Update button state based on current selection and limit
     this._updateAddButtonState();
 
+    let highlightUnsetTimeout = null;
+
     // Render each color
     for (let i = 0; i < this._colors.length; i++) {
       const color = this._colors[i];
@@ -216,11 +218,15 @@ export class ColorPalette {
 
       // Add hover event listeners for highlighting
       colorItem.addEventListener('mouseenter', () => {
+        window.clearTimeout(highlightUnsetTimeout);
         this._onUpdate({ highlightIndex: i });
       });
 
       colorItem.addEventListener('mouseleave', () => {
-        this._onUpdate({ highlightIndex: null, delayMs: 100 });
+        window.clearTimeout(highlightUnsetTimeout);
+        highlightUnsetTimeout = window.setTimeout(() => {
+          this._onUpdate({ highlightIndex: null });
+        }, 100); // Delay to avoid flickering
       });
 
       this._colorList.appendChild(colorItem);
@@ -237,7 +243,7 @@ export class ColorPalette {
       this._colors.splice(index, 1);
       this._setCustomState();
       this._renderColors();
-      this._onUpdate();
+      this._onUpdate({ recalculateSelection: true });
     }
   }
 
@@ -253,7 +259,7 @@ export class ColorPalette {
       this._colors[index] = new NamedColor(newName.trim(), color.rgbColor);
       this._setCustomState();
       this._renderColors();
-      this._onUpdate();
+      this._onUpdate({ recalculateSelection: true });
     }
   }
 
@@ -272,7 +278,7 @@ export class ColorPalette {
     this._colors.unshift(new NamedColor(name, rgbColor));
     this._setCustomState();
     this._renderColors();
-    this._onUpdate();
+    this._onUpdate({ recalculateSelection: true });
 
     // Highlight the newly added item
     const newItem = this._colorList.firstChild;

@@ -218,4 +218,6 @@ const ColorPresets = {
     new NamedColor('White', hexToRgb('#FFFFFF')),
     new NamedColor('Black', hexToRgb('#000000'))
   ],
+
+  'Empty': [],
 };

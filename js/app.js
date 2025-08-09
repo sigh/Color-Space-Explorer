@@ -11,8 +11,8 @@ import { deferUntilAnimationFrame } from './utils.js';
 class ColorSpaceExplorer {
   constructor() {
     this._canvasContainer = document.querySelector('.canvas-container');
-    this._debouncedUpdateRenderer = this._createDebouncedUpdater(
-      deferUntilAnimationFrame(this._updateRenderer.bind(this)));
+    this._deferredUpdateRenderer = deferUntilAnimationFrame(
+      this._updateRenderer.bind(this));
 
     this._selectionIndicator = null;
 
@@ -23,7 +23,9 @@ class ColorSpaceExplorer {
     this._colorPalette = new ColorPalette(
       paletteContainer,
       this._colorDisplay,
-      this._debouncedUpdateRenderer.bind(this));
+      // Don't defer palette updates, as they have arguments which shouldn't
+      // get overridden by later calls.
+      this._updateRenderer.bind(this));
 
     // Try to load state from URL, otherwise use defaults
     const initialColorSpaceView = URLStateManager.deserializeColorSpaceViewFromURL();
@@ -31,39 +33,36 @@ class ColorSpaceExplorer {
     this._uiController = new UIController(
       initialColorSpaceView, (options) => {
         this._clearSelection();  // Clear selection on color space change
-        this._debouncedUpdateRenderer(options);
+        this._deferredUpdateRenderer(options);
       });
   }
 
   async init() {
     this._renderer = await CanvasRenderer.create(this._canvasContainer);
     this._setupMouseHandlers();
-    this._updateRenderer(); // No deferral
-
-    // Initialize selection from URL fragment after renderer has had time to render
-    // Use requestAnimationFrame to ensure the render is complete
-    const coordinates = URLStateManager.deserializeSelectionFromFragment();
-    if (coordinates) {
-      requestAnimationFrame(() => {
-        this._initializeSelectionFromURL(coordinates);
-      });
-    }
+    this._updateRenderer({ recalculateSelection: true }); // No deferral
   }
 
   /**
    * Initialize selection from URL fragment if coordinates are present
-   * @param {Array<number>} coordinates - Canvas coordinates as [x, y]
    */
-  _initializeSelectionFromURL(coordinates) {
-    const [x, y] = coordinates;
+  _maySetSelectionFromURL() {
+    const coordinates = URLStateManager.deserializeSelectionFromFragment();
+    if (coordinates) {
+      // Use requestAnimationFrame to ensure the render is complete
+      requestAnimationFrame(() => {
+        const [x, y] = coordinates;
 
-    const [rgbColor, closestColor] = this._renderer.getColorAt(x, y);
+        const [rgbColor, closestColor] = this._renderer.getColorAt(x, y);
+        console.log(coordinates, rgbColor, closestColor);
 
-    // Set as selected if we have a valid color, otherwise clear selection
-    if (rgbColor !== null) {
-      this.setSelection(coordinates, rgbColor, closestColor);
-    } else {
-      this._clearSelection();
+        // Set as selected if we have a valid color, otherwise clear selection
+        if (rgbColor !== null) {
+          this.setSelection(coordinates, rgbColor, closestColor);
+        } else {
+          this._clearSelection();
+        }
+      });
     }
   }
 
@@ -76,8 +75,8 @@ class ColorSpaceExplorer {
   setSelection(coordinates, rgbColor, closestColor) {
     coordinates = coordinates.map(coord => Math.round(coord));
 
-    this._colorDisplay.setSelectedColors(rgbColor, closestColor);
     this._createSelectionIndicator(...coordinates);
+    this._colorDisplay.setSelectedColors(rgbColor, closestColor);
     URLStateManager.serializeSelectionToFragment(coordinates);
   }
 
@@ -93,36 +92,6 @@ class ColorSpaceExplorer {
     }
   }
 
-  /**
-   * Creates a debounced function that can handle delayed execution
-   * @param {Function} func - The function to debounce
-   * @returns {Function} The debounced function
-   */
-  _createDebouncedUpdater(func) {
-    let timeoutId = null;
-
-    return (options) => {
-      const delayMs = options?.delayMs;
-
-      // Clear any existing timeout
-      if (timeoutId) {
-        clearTimeout(timeoutId);
-        timeoutId = null;
-      }
-
-      if (delayMs && delayMs > 0) {
-        // Set up delayed execution
-        timeoutId = setTimeout(() => {
-          func(options);
-          timeoutId = null;
-        }, delayMs);
-      } else {
-        // Immediate execution
-        func(options);
-      }
-    };
-  }
-
   _updateRenderer(options) {
     if (!this._renderer) return;
     const colorSpaceView = this._uiController.getCurrentColorSpaceView();
@@ -134,6 +103,10 @@ class ColorSpaceExplorer {
 
     // Serialize state to URL whenever we render
     URLStateManager.serializeColorSpaceViewToURL(colorSpaceView);
+
+    if (options?.recalculateSelection) {
+      this._maySetSelectionFromURL();
+    }
   }
 
   _setupMouseHandlers() {
@@ -144,8 +117,12 @@ class ColorSpaceExplorer {
       return [x, y];
     };
 
-    const deferredSetColors = deferUntilAnimationFrame(
-      this._colorDisplay.setColors.bind(this._colorDisplay));
+    const deferredSetColors = deferUntilAnimationFrame((...colors) => {
+      if (!this._selectionIndicator) {
+        // Ensure nothing was selected in the meantime.
+        this._colorDisplay.setColors(...colors);
+      }
+    });
 
     // Mouse move handler for hover effect
     this._canvasContainer.addEventListener('mousemove', (event) => {
@@ -209,7 +186,7 @@ class ColorSpaceExplorer {
    * @param {number} y - Y coordinate relative to canvas
    */
   _createSelectionIndicator(x, y) {
-    this._clearSelection();
+    this._selectionIndicator?.remove();
 
     // Create indicator element positioned absolutely within canvas container
     this._selectionIndicator = document.createElement('div');
