@@ -33,9 +33,9 @@
   --accent-primary: #6366f1;
   --accent-hover: #5855eb;
 
-  /* Add button colors */
-  --add-btn-bg: #16a34a;
-  --add-btn-bg-hover: #047857;
+  /* Add action colors */
+  --add-action: #16a34a;
+  --add-action-hover: #047857;
 
   /* Border radius */
   --radius-textbox: 2px;
@@ -195,11 +195,11 @@ h3 {
 
 @keyframes newItemHighlight {
   0% {
-    box-shadow: inset 0 0 50px var(--add-btn-bg);
+    box-shadow: inset 0 0 50px var(--add-action);
   }
 
   100% {
-    box-shadow: inset 0 0 0px var(--add-btn-bg);
+    box-shadow: inset 0 0 0px var(--add-action);
   }
 }
 
@@ -225,7 +225,10 @@ h3 {
   padding: 8px 10px;
   border-radius: var(--radius-button);
   color: var(--text-unselected);
-  transition: all 0.15s ease;
+
+  transition-property: color, background, border;
+  transition-duration: 0.15s;
+  transition-timing-function: ease;
 }
 
 .radio-button {
@@ -233,7 +236,7 @@ h3 {
 }
 
 .add-color-btn {
-  background: var(--add-btn-bg);
+  background: var(--add-action);
   color: var(--text-primary);
 }
 
@@ -247,7 +250,7 @@ h3 {
 }
 
 .add-color-btn:hover {
-  background: var(--add-btn-bg-hover);
+  background: var(--add-action-hover);
   color: var(--text-secondary);
 }
 
@@ -345,8 +348,11 @@ h3 {
   border: 1px solid var(--bg-surface-hover);
   border-radius: var(--radius-toggle);
   position: relative;
-  transition: background, border-color 0.2s ease;
   flex-shrink: 0;
+
+  transition-property: color, border;
+  transition-duration: 0.15s;
+  transition-timing-function: ease;
 }
 
 .control-label:has(.toggle-checkbox)::after {
@@ -593,7 +599,7 @@ h3 {
   content: "+";
   width: 24px;
   height: 24px;
-  background: var(--add-btn-bg);
+  background: var(--add-action);
   color: var(--text-primary);
   border: 0.5px solid var(--border-default);
   border-radius: 50%;
