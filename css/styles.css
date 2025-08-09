@@ -220,7 +220,8 @@ h3 {
   font-weight: 500;
   text-transform: uppercase;
   letter-spacing: 0.05em;
-  padding: 8px 12px;
+  text-align: center;
+  padding: 8px 10px;
   border-radius: var(--radius-button);
   color: var(--text-unselected);
   transition: all 0.15s ease;
