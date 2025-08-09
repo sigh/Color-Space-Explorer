@@ -14,6 +14,9 @@ export class UIController {
     // Boundaries toggle element
     this._boundariesToggle = document.getElementById('boundariesToggle');
 
+    // Polar coordinates toggle element
+    this._polarToggle = document.getElementById('polarToggle');
+
     // Callback
     this._onColorViewUpdate = onColorSpaceChange;
 
@@ -21,6 +24,11 @@ export class UIController {
     this._boundariesToggle.addEventListener('change', () => {
       this._onColorViewUpdate();
     });
+
+    this._polarToggle.addEventListener('change', () => {
+      this._onColorViewUpdate();
+    });
+
     this._setupColorSpaceControls(initialColorSpaceView.colorSpace);
 
     // Set the current state from the view
@@ -28,6 +36,7 @@ export class UIController {
     this._axisSlider.value = initialColorSpaceView.currentValue;
     this._updateSliderLabel(initialColorSpaceView);
     this._boundariesToggle.checked = initialColorSpaceView.showBoundaries;
+    this._polarToggle.checked = initialColorSpaceView.usePolarCoordinates;
   }
 
   /**
@@ -151,8 +160,24 @@ export class UIController {
     // Update display
     this._updateSliderLabel(colorSpaceView);
 
+    // Update polar toggle visibility
+    this._updatePolarToggleVisibility();
+
     // Notify change
     this._onColorViewUpdate();
+  }
+
+  /**
+   * Update the visibility of the polar coordinates toggle
+   */
+  _updatePolarToggleVisibility() {
+    const polarAxis = this._colorSpace.availablePolarAxis(this._currentAxis);
+    this._polarToggle.parentNode.style.visibility = polarAxis ? 'visible' : 'hidden';
+
+    // Reset polar toggle to false if it's not available
+    if (!polarAxis) {
+      this._polarToggle.checked = false;
+    }
   }
 
   /**
@@ -176,7 +201,8 @@ export class UIController {
       this._colorSpace,
       this._currentAxis,
       parseInt(this._axisSlider.value),
-      this._boundariesToggle.checked
+      this._boundariesToggle.checked,
+      this._polarToggle.checked && this._colorSpace.availablePolarAxis(this._currentAxis)
     );
   }
 }

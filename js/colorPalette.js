@@ -3,7 +3,7 @@ import { clearElement, createElement, createTextNode } from './utils.js';
 import { NamedColor, getPresetNames, getPreset } from './namedColor.js';
 
 // Maximum palette colors (must match shader constant)
-const MAX_PALETTE_COLORS = 200;
+export const MAX_PALETTE_COLORS = 200;
 
 /**
  * Create a color item element styled like palette colors

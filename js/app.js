@@ -57,13 +57,14 @@ class ColorSpaceExplorer {
   _initializeSelectionFromURL(coordinates) {
     const [x, y] = coordinates;
 
-    // Validate coordinates are within canvas bounds
-    const rect = this._canvasContainer.getBoundingClientRect();
-    if (x < 0 || x >= rect.width || y < 0 || y >= rect.height) return;
-
-    // Get color at the coordinates and set as selected
     const [rgbColor, closestColor] = this._renderer.getColorAt(x, y);
-    this.setSelection(coordinates, rgbColor, closestColor);
+
+    // Set as selected if we have a valid color, otherwise clear selection
+    if (rgbColor !== null) {
+      this.setSelection(coordinates, rgbColor, closestColor);
+    } else {
+      this._clearSelection();
+    }
   }
 
   /**
@@ -136,7 +137,7 @@ class ColorSpaceExplorer {
   }
 
   _setupMouseHandlers() {
-    const getMouseCoords = (event) => {
+    const getCanvasCoordsFromMouseEvent = (event) => {
       const rect = this._canvasContainer.getBoundingClientRect();
       const x = event.clientX - rect.left;
       const y = event.clientY - rect.top;
@@ -146,24 +147,20 @@ class ColorSpaceExplorer {
     const deferredSetColors = deferUntilAnimationFrame(
       this._colorDisplay.setColors.bind(this._colorDisplay));
 
-    const setColorForMouseEvent = (event, isSelecting) => {
-      const [x, y] = getMouseCoords(event);
-
-      const [rgbColor, closestColor] = this._renderer.getColorAt(x, y);
-
-      if (isSelecting) {
-        this.setSelection([x, y], rgbColor, closestColor);
-      } else {
-        deferredSetColors(rgbColor, closestColor);
-      }
-    };
-
     // Mouse move handler for hover effect
     this._canvasContainer.addEventListener('mousemove', (event) => {
       // Skip hover updates if there's a selection
       if (this._selectionIndicator) return;
 
-      setColorForMouseEvent(event, false);
+      const [x, y] = getCanvasCoordsFromMouseEvent(event);
+      const [rgbColor, closestColor] = this._renderer.getColorAt(x, y);
+
+      if (rgbColor === null) {
+        this._colorDisplay.clearColors();
+        return;
+      }
+
+      deferredSetColors(rgbColor, closestColor);
     });
 
     // Mouse leave handler to reset to default
@@ -178,21 +175,13 @@ class ColorSpaceExplorer {
     const centerPanel = document.querySelector('.canvas-panel');
     centerPanel.addEventListener('click', (event) => {
       const selectionClicked = event.target === this._selectionIndicator;
-      const canvasClicked = this._canvasContainer.contains(event.target);
+      const [x, y] = getCanvasCoordsFromMouseEvent(event);
+      const [rgbColor, closestColor] = this._renderer.getColorAt(x, y);
 
-      if (!canvasClicked) {
-        this._clearSelection();
-        return;
-      }
-
-      // Handle command-click (or ctrl-click on Windows) for direct color addition
+      // Handle command-click or ctrl-click for direct color addition
       if ((event.metaKey || event.ctrlKey)) {
-        const [x, y] = getMouseCoords(event);
-        const [rgbColor, closestColor] = this._renderer.getColorAt(x, y);
-
-        // Directly add color to palette without going through color display
-        const success = this._colorPalette.addColor(rgbColor, closestColor);
-        if (success) {
+        // Try to add the color to the palette
+        if (rgbColor !== null && this._colorPalette.addColor(rgbColor, closestColor)) {
           // Show brief visual feedback at click location
           this._showAddFeedback(x, y);
         }
@@ -200,7 +189,17 @@ class ColorSpaceExplorer {
       }
 
       this._clearSelection();
-      setColorForMouseEvent(event, !selectionClicked);
+
+      if (rgbColor === null) {
+        this._colorDisplay.clearColors();
+        return;
+      }
+
+      if (!selectionClicked) {
+        this.setSelection([x, y], rgbColor, closestColor);
+      } else {
+        deferredSetColors(rgbColor, closestColor);
+      }
     });
   }
 
@@ -259,9 +258,10 @@ class URLStateManager {
     params.set('space', colorSpaceView.colorSpace.getType());
     params.set(colorSpaceView.currentAxis.key, colorSpaceView.currentValue.toString());
     const regionsParam = colorSpaceView.showBoundaries ? '&regions' : '';
+    const polarParam = colorSpaceView.usePolarCoordinates ? '&polar' : '';
 
     const fragment = window.location.hash;
-    const newURL = `${window.location.pathname}?${params.toString()}${regionsParam}${fragment}`;
+    const newURL = `${window.location.pathname}?${params.toString()}${regionsParam}${polarParam}${fragment}`;
 
     window.history.replaceState(null, '', newURL);
   }
@@ -330,8 +330,9 @@ class URLStateManager {
     }
 
     const showBoundaries = params.has('regions');
+    const usePolarCoordinates = params.has('polar');
 
-    return new ColorSpaceView(colorSpace, axis, value, showBoundaries);
+    return new ColorSpaceView(colorSpace, axis, value, showBoundaries, usePolarCoordinates);
   }
 }
 

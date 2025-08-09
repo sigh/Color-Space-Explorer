@@ -36,11 +36,12 @@ export class Axis {
  * Immutable color space view - a simple container for current axis and value
  */
 export class ColorSpaceView {
-  constructor(colorSpace, currentAxis, currentValue, showBoundaries = true) {
+  constructor(colorSpace, currentAxis, currentValue, showBoundaries = true, usePolarCoordinates = false) {
     this.colorSpace = colorSpace;
     this.currentAxis = currentAxis;
     this.currentValue = currentValue;
     this.showBoundaries = showBoundaries;
+    this.usePolarCoordinates = usePolarCoordinates;
 
     // Freeze the object to make it immutable
     Object.freeze(this);
@@ -106,6 +107,15 @@ export class ColorSpace {
    */
   getDefaultAxis() {
     return this._defaultAxis;
+  }
+
+  /**
+   * Get the axis that can be used for polar coordinates (has degree units)
+   * @param {Axis} fixedAxis - The axis that is fixed (not variable)
+   * @returns {Axis|undefined} The axis with degree units, or undefined if none available
+   */
+  availablePolarAxis(fixedAxis) {
+    return this._axes.find(axis => axis !== fixedAxis && axis.unit === '°');
   }
 }
 

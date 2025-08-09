@@ -6,6 +6,7 @@ uniform bool u_showBoundaries;
 uniform int u_highlightPaletteIndex; // Index of palette color to highlight (-1 = no highlight)
 
 const int MIP_LEVEL = 0;
+const int OUTSIDE_COLOR_SPACE = 255;
 
 // Convert float palette index (stored in alpha channel) to int
 int getPaletteIndex(float paletteIndexFloat) {
@@ -16,13 +17,19 @@ bool isBoundary(ivec2 pixelCoord, vec3 centerColor, int centerPaletteIndex) {
   // Check left neighbor if not at left edge
   if (pixelCoord.x > 0) {
     vec4 left = texelFetch(u_colorTexture, pixelCoord + ivec2(-1, 0), MIP_LEVEL);
-    if (centerPaletteIndex != getPaletteIndex(left.a)) return true;
+    int paletteIndex = getPaletteIndex(left.a);
+    if (paletteIndex != centerPaletteIndex && paletteIndex != OUTSIDE_COLOR_SPACE) {
+      return true;
+    }
   }
 
   // Check bottom neighbor if not at bottom edge
   if (pixelCoord.y > 0) {
     vec4 bottom = texelFetch(u_colorTexture, pixelCoord + ivec2(0, -1), MIP_LEVEL);
-    if (centerPaletteIndex != getPaletteIndex(bottom.a)) return true;
+    int paletteIndex = getPaletteIndex(bottom.a);
+    if (paletteIndex != centerPaletteIndex && paletteIndex != OUTSIDE_COLOR_SPACE) {
+      return true;
+    }
   }
 
   return false;
@@ -58,6 +65,12 @@ void main() {
   // Split out color and palette index
   vec3 baseColor = center.rgb;
   int paletteIndex = getPaletteIndex(center.a);
+
+  // Check if this is an invalid coordinate first
+  if (paletteIndex == OUTSIDE_COLOR_SPACE) {
+    fragColor = vec4(0.0, 0.0, 0.0, 0.0); // Fully transparent for invalid coordinates
+    return;
+  }
 
   // Apply highlighting first (but not on boundaries)
   vec3 colorWithHighlight = applyHighlighting(baseColor, paletteIndex);

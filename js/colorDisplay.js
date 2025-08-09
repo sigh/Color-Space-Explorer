@@ -100,9 +100,11 @@ export class ColorDisplay {
   }
 
   /**
-   * Clear color displays when not hovering
+   * Clear color displays
    */
   clearColors() {
+    if (!this._colorSwatch.classList.contains('has-color')) return;
+
     this._selectedColors = [null, null];
     this._setTitle(null, false);
 

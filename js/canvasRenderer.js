@@ -1,5 +1,8 @@
 import { getAllColorSpaces, RgbColor } from "./colorSpace.js";
 import { clearElement, createElement } from "./utils.js";
+import { MAX_PALETTE_COLORS } from "./colorPalette.js";
+
+const OUTSIDE_COLOR_SPACE = 255;
 
 /**
  * WebGL2 Canvas renderer for color spaces with framebuffer rendering
@@ -67,6 +70,7 @@ export class CanvasRenderer {
       colorSpaceIndexLocation: gl.getUniformLocation(computeProgram, 'u_colorSpaceIndex'),
       paletteColorsLocation: gl.getUniformLocation(computeProgram, 'u_paletteColors'),
       paletteCountLocation: gl.getUniformLocation(computeProgram, 'u_paletteCount'),
+      polarCoordinateAxisLocation: gl.getUniformLocation(computeProgram, 'u_polarCoordinateAxis'),
     };
 
     // Create and configure render program
@@ -188,22 +192,29 @@ export class CanvasRenderer {
     // Store palette colors for consistency with indices
     this._paletteColors = [...paletteColors];
 
+    let polarAxis = null;
+    if (colorSpaceView.usePolarCoordinates) {
+      polarAxis = colorSpaceView.colorSpace.availablePolarAxis(
+        colorSpaceView.currentAxis);
+    }
+
     // Compute phase: Render color space computation with closest palette index to framebuffer
-    this._computePhase(colorSpaceView, paletteColors);
+    this._computePhase(colorSpaceView, paletteColors, polarAxis);
 
     // Render phase: Render framebuffer texture to canvas
     this._renderPhase(colorSpaceView.showBoundaries, highlightPaletteIndex);
 
     // Update axis labels for the current color space view
-    this._updateAxisLabels(colorSpaceView);
+    this._updateAxisLabels(colorSpaceView, polarAxis);
   }
 
   /**
    * Compute phase: Render color space computation to framebuffer
    * @param {ColorSpaceView} colorSpaceView - Immutable color space view
    * @param {Array<NamedColor>} paletteColors - Array of palette colors to find closest matches for
+   * @param {Axis|null} polarAxis - Axis to use for polar coordinates, or null if not polar display
    */
-  _computePhase(colorSpaceView, paletteColors) {
+  _computePhase(colorSpaceView, paletteColors, polarAxis) {
     const gl = this._gl;
 
     // Bind framebuffer
@@ -219,13 +230,17 @@ export class CanvasRenderer {
     gl.uniform1f(this._compute.fixedValueLocation, colorSpaceView.currentValue / colorSpaceView.currentAxis.max);
     gl.uniform1i(this._compute.colorSpaceIndexLocation, getAllColorSpaces().indexOf(colorSpaceView.colorSpace));
 
+    // Set polar coordinates uniform
+    const polarCoordinateAxis = polarAxis !== null ?
+      colorSpaceView.colorSpace.getAxisIndex(polarAxis) : -1;
+    gl.uniform1i(this._compute.polarCoordinateAxisLocation, polarCoordinateAxis);
+
     // Set palette colors uniforms
-    const maxPaletteColors = 200; // Allow up to 200 palette colors
-    const actualCount = Math.min(paletteColors.length, maxPaletteColors);
+    const actualCount = Math.min(paletteColors.length, MAX_PALETTE_COLORS);
     gl.uniform1i(this._compute.paletteCountLocation, actualCount);
 
     // Convert palette colors to flat array of RGB values
-    const paletteData = new Float32Array(maxPaletteColors * 3);
+    const paletteData = new Float32Array(MAX_PALETTE_COLORS * 3);
     for (let i = 0; i < actualCount; i++) {
       const paletteColor = paletteColors[i];
       const [r, g, b] = paletteColor.rgbColor;
@@ -273,10 +288,18 @@ export class CanvasRenderer {
   /**
    * Update axis labels and tick marks for the current color space view
    * @param {ColorSpaceView} colorSpaceView - Current color space view
+   * @param {Axis|null} polarAxis - Axis to use for polar coordinates, or null if not polar display
    */
-  _updateAxisLabels(colorSpaceView) {
+  _updateAxisLabels(colorSpaceView, polarAxis) {
     // Clear existing labels by emptying the axis container
     clearElement(this._axisContainer);
+
+    if (polarAxis) {
+      this._addPolarAxisLabels(polarAxis, 'theta-axis');
+      return;
+    }
+
+    // For regular cartesian coordinates, we need to figure out which axes to display.
 
     const colorSpace = colorSpaceView.colorSpace;
     const axes = colorSpace.getAllAxes();
@@ -284,25 +307,47 @@ export class CanvasRenderer {
 
     // Get the two variable axes (non-fixed)
     const variableAxes = axes.filter((_, index) => index !== currentAxisIndex);
-
     if (variableAxes.length !== 2) return; // Should always be 2 for a 2D canvas
 
-    // X-axis (bottom) - first variable axis
-    this._createAxisLabelAndTicks(variableAxes[0], 'x-axis');
-
-    // Y-axis (left) - second variable axis
-    this._createAxisLabelAndTicks(variableAxes[1], 'y-axis');
+    this._addCartesianAxisLabels(variableAxes[0], 'x-axis');
+    this._addCartesianAxisLabels(variableAxes[1], 'y-axis');
   }
 
   /**
-   * Create axis label and ticks
+   * Add polar axis labels and ticks
+   * @param {Axis} polarAxis - The polar axis to label
+   * @param {string} className - CSS class for the axis ('theta-axis')
+   */
+  _addPolarAxisLabels(polarAxis, className) {
+    const numIntervals = 8;
+    for (let i = 0; i < numIntervals; i++) {
+      const angle = (i / numIntervals) * 2 * Math.PI; // Convert to radians
+
+      const value = Math.round((i / numIntervals) * polarAxis.max);
+      const tick = createElement('div', `${value}${polarAxis.unit}`);
+      tick.className = `tick-mark ${className}`;
+      if (i == 0) {
+        tick.textContent += ` ${polarAxis.name}`;
+        tick.classList.add('axis-title');
+      }
+
+      const x = 0.5 * (1 + Math.cos(angle) * 1.06);
+      const y = 0.5 * (1 - Math.sin(angle) * 1.06);
+      tick.style.left = `${Math.round(x * this._width)}px`;
+      tick.style.top = `${Math.round(y * this._height)}px`;
+      this._axisContainer.appendChild(tick);
+    }
+  }
+
+  /**
+   * Add axis title and ticks
    * @param {Axis} axis
    * @param {string} className - CSS class ('x-axis' or 'y-axis')
    */
-  _createAxisLabelAndTicks(axis, className) {
-    const label = createElement('div', axis.name);
-    label.className = `axis-label ${className}`;
-    this._axisContainer.appendChild(label);
+  _addCartesianAxisLabels(axis, className) {
+    const titleDiv = createElement('div', axis.name);
+    titleDiv.className = `axis-title ${className}`;
+    this._axisContainer.appendChild(titleDiv);
 
     // Add tick marks at intervals of 0.2 from 0.0 to 1.0
     const numIntervals = 5;
@@ -338,14 +383,17 @@ export class CanvasRenderer {
    * Get color at canvas coordinates by reading from the framebuffer
    * @param {number} x - X coordinate
    * @param {number} y - Y coordinate
-   * @returns {Array} Tuple [RgbColor, closestColor] where RgbColor is normalized (0-1) and closestColor is a NamedColor object or null
+   * @returns {Array} Tuple [RgbColor, NamedColor] where RgbColor is
+   *    normalized (0-1) and closestColor is a NamedColor object or null.
+   *    Both will be null for invalid coordinates.
    */
   getColorAt(x, y) {
-    const gl = this._gl;
+    // Coordinates outside the canvas bounds
+    if (x < 0 || x >= this._width || y < 0 || y >= this._height) {
+      return [null, null];
+    }
 
-    // Clamp coordinates to canvas bounds
-    x = Math.max(0, Math.min(x, this._width - 1));
-    y = Math.max(0, Math.min(y, this._height - 1));
+    const gl = this._gl;
 
     // WebGL coordinates are flipped vertically
     const glY = this._height - 1 - y;
@@ -360,8 +408,13 @@ export class CanvasRenderer {
     // Restore default framebuffer
     gl.bindFramebuffer(gl.FRAMEBUFFER, null);
 
-    // Look up the closest palette color using the index from alpha channel
+    // Check if we are outside the color space
     const paletteIndex = pixels[3];
+    if (paletteIndex === OUTSIDE_COLOR_SPACE) {
+      return [null, null];
+    }
+
+    // Look up the closest palette color using the index from alpha channel
     const closestColor = (paletteIndex < this._paletteColors.length)
       ? this._paletteColors[paletteIndex]
       : null;

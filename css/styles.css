@@ -18,6 +18,7 @@
   --border-default: #374151;
   --border-hover: #6b7280;
   --border-focus: #6366f1;
+  --border-canvas: #ffffff;
 
   /* Text colors */
   --text-title: #d1d5db;
@@ -344,7 +345,7 @@ h3 {
   border: 1px solid var(--bg-surface-hover);
   border-radius: var(--radius-toggle);
   position: relative;
-  transition: all 0.2s ease;
+  transition: background, border-color 0.2s ease;
   flex-shrink: 0;
 }
 
@@ -358,7 +359,7 @@ h3 {
   top: 50%;
   left: 2px;
   transform: translateY(-50%);
-  transition: all 0.2s ease;
+  transition: background, left 0.2s ease;
 }
 
 .control-label:has(.toggle-checkbox:checked)::before {
@@ -486,7 +487,7 @@ h3 {
 }
 
 .canvas-container canvas {
-  border: 1px solid var(--border-default);
+  filter: drop-shadow(0 0 2px var(--border-canvas));
 }
 
 /* Selection indicator */
@@ -541,7 +542,7 @@ h3 {
   z-index: 10;
 }
 
-.axis-label,
+.axis-title,
 .tick-mark {
   position: absolute;
 }
@@ -554,12 +555,12 @@ h3 {
   right: 100%;
 }
 
-.axis-label.x-axis {
+.axis-title.x-axis {
   left: 50%;
   transform: translate(-50%, -50%) translate(2px, 20px);
 }
 
-.axis-label.y-axis {
+.axis-title.y-axis {
   top: 50%;
   transform: rotate(-90deg) translate(50%, -50%) translate(8px, -25px);
   transform-origin: right;
@@ -571,6 +572,14 @@ h3 {
 
 .tick-mark.y-axis {
   transform: translateY(-50%) translateX(-5px);
+}
+
+.tick-mark.theta-axis {
+  transform: translate(-50%, -50%);
+}
+
+.tick-mark.axis-title.theta-axis {
+  transform: translateY(-50%) translateX(-10px);
 }
 
 /* Add feedback for command-click */
