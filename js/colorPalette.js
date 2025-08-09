@@ -110,6 +110,7 @@ export class ColorPalette {
     this._colorDisplay = colorDisplay;
     this._onUpdate = onUpdate || (() => { });
     this._initializeUI();
+    this._currentHighlight = null;
   }
 
   /**
@@ -119,6 +120,8 @@ export class ColorPalette {
     // Register with color display for button state changes
     this._colorDisplay.onColorChange(() => {
       this._updateAddButtonState();
+
+      this._updateHighlightedColor();
     });
 
     // Clear existing content
@@ -145,7 +148,9 @@ export class ColorPalette {
     // Create Add button
     this._addButton.style.visibility = 'hidden'; // Hidden but takes up space
     this._addButton.addEventListener('click', () => {
-      this.addColor(...this._colorDisplay.getSelectedColors());
+      if (this._colorDisplay.hasSelectedColor()) {
+        this.addColor(...this._colorDisplay.getCurrentColors());
+      }
     });
 
     // Create scrollable color list container
@@ -154,6 +159,33 @@ export class ColorPalette {
     this.container.appendChild(this._colorList);
 
     this._renderColors();
+  }
+
+  _updateHighlightedColor() {
+    const [_, closestColor] = this._colorDisplay.getCurrentColors();
+    if (closestColor !== this._currentHighlight) {
+      if (this._currentHighlight !== null) {
+        this._getElementForColor(
+          this._currentHighlight)?.classList.remove('color-item-highlighted');
+      }
+      if (closestColor !== null) {
+        console.log(closestColor, this._getElementForColor(closestColor));
+        this._getElementForColor(
+          closestColor)?.classList.add('color-item-highlighted');
+      }
+      this._currentHighlight = closestColor;
+    }
+  }
+
+  /**
+   * Get the DOM element representing a color in the palette
+   * @param {NamedColor} color - The color object to find
+   * @returns {HTMLElement|null} The color element or null if not found
+   */
+  _getElementForColor(color) {
+    const index = this._colors.indexOf(color);
+    if (index === -1) return null;
+    return this._colorList.children[index];
   }
 
   /**
@@ -314,8 +346,7 @@ export class ColorPalette {
    * Update add button state based on selection and color count
    */
   _updateAddButtonState() {
-    const [selectedColor] = this._colorDisplay.getSelectedColors();
-    const hasSelection = !!selectedColor;
+    const hasSelection = this._colorDisplay.hasSelectedColor();
     const isAtLimit = this._colors.length >= MAX_PALETTE_COLORS;
 
     const isEnabled = hasSelection && !isAtLimit;

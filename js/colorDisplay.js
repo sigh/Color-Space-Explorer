@@ -9,7 +9,8 @@ export class ColorDisplay {
   constructor(container) {
     this._container = container;
     this._onColorChangeCallback = () => { };
-    this._selectedColors = [null, null]; // [selectedColor, closestColor]
+    this._currentColors = [null, null]; // [currentColor, closestColor]
+    this._isSelected = false;
 
     // Color display elements within the container
     this._colorSwatch = container.querySelector('.color-swatch');
@@ -32,7 +33,9 @@ export class ColorDisplay {
    * @param {NamedColor|null} closestColor - The closest palette color or null if no palette
    */
   setSelectedColors(rgbColor, closestColor) {
-    this._selectedColors = [rgbColor, closestColor];
+    this._currentColors = [rgbColor, closestColor];
+    this._isSelected = true;
+
     this._setCurrentColor(rgbColor);
     this._setClosestColor(closestColor);
     this._setTitle(rgbColor, true);
@@ -45,7 +48,9 @@ export class ColorDisplay {
    * @param {NamedColor|null} closestColor - The closest palette color or null if no palette
    */
   setColors(rgbColor, closestColor) {
-    this._selectedColors = [null, null];
+    this._currentColors = [rgbColor, closestColor];
+    this._isSelected = false;
+
     this._setCurrentColor(rgbColor);
     this._setClosestColor(closestColor);
     this._setTitle(rgbColor, false);
@@ -106,7 +111,8 @@ export class ColorDisplay {
   clearColors() {
     if (!this._colorSwatch.classList.contains('has-color')) return;
 
-    this._selectedColors = [null, null];
+    this._currentColors = [null, null];
+    this._isSelected = false;
     this._setTitle(null, false);
 
     // Reset color swatch to empty state
@@ -122,11 +128,18 @@ export class ColorDisplay {
   }
 
   /**
-   * Get the selected colors for adding to palette
-   * @returns {Array} Array containing [selectedColor, closestColor] where selectedColor is RgbColor|null and closestColor is NamedColor|null
+   * Get the current colors
+   * @returns {Array} Array containing [currentColor, closestColor]
    */
-  getSelectedColors() {
-    return [...this._selectedColors];
+  getCurrentColors() {
+    return [...this._currentColors];
+  }
+
+  /**
+   * Determine if the color is currently selected
+   */
+  hasSelectedColor() {
+    return this._isSelected;
   }
 
   /**

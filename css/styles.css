@@ -195,6 +195,14 @@ h3 {
   }
 }
 
+.color-item.color-item-highlighted {
+  background: var(--accent-primary);
+}
+
+.color-item.color-item-highlighted:hover {
+  background: var(--accent-hover);
+}
+
 /* Button styles */
 .radio-button,
 .color-delete-btn,

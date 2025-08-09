@@ -57,7 +57,6 @@ class ColorSpaceExplorer {
         const [x, y] = coordinates;
 
         const [rgbColor, closestColor] = this._renderer.getColorAt(x, y);
-        console.log(coordinates, rgbColor, closestColor);
 
         // Set as selected if we have a valid color, otherwise clear selection
         if (rgbColor !== null) {
