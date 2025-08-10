@@ -6,6 +6,7 @@ uniform float u_fixedValue;
 uniform int u_colorSpaceIndex; // 0=RGB, 1=HSV, 2=HSL
 uniform int u_axisIndex; // Ordered as the color-space initials.
 uniform int u_polarCoordinateAxis; // Index of axis to convert to angle (-1 = no polar coordinates)
+uniform int u_distanceMetric; // 0=Delta E (LAB), 1=RGB Euclidean
 
 const int MAX_PALETTE_COLORS = 200;
 uniform vec3 u_paletteColors[MAX_PALETTE_COLORS]; // Maximum palette colors
@@ -105,14 +106,23 @@ float distance2(vec3 v1, vec3 v2) {
 
 // Returns the index of the closest palette color
 int findClosestPaletteIndex(vec3 color) {
-  vec3 labColor = rgbToLab(color); // Only convert once
   float minDistance2 = 1000000.0;
   int closestIndex = 0;
 
   for (int i = 0; i < MAX_PALETTE_COLORS; i++) {
     if (i >= u_paletteCount) break;
-    vec3 labPaletteColor = rgbToLab(u_paletteColors[i]);
-    float d2 = distance2(labColor, labPaletteColor);
+
+    float d2;
+    if (u_distanceMetric == 0) {
+      // Delta E (LAB) distance
+      vec3 labColor = rgbToLab(color);
+      vec3 labPaletteColor = rgbToLab(u_paletteColors[i]);
+      d2 = distance2(labColor, labPaletteColor);
+    } else {
+      // RGB Euclidean distance
+      d2 = distance2(color, u_paletteColors[i]);
+    }
+
     if (d2 < minDistance2) {
       minDistance2 = d2;
       closestIndex = i;

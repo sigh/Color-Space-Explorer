@@ -1,6 +1,6 @@
 import { CanvasRenderer } from './canvasRenderer.js';
 import { UIController } from './uiController.js';
-import { getAllColorSpaces, ColorSpaceView, getColorSpaceByType } from './colorSpace.js';
+import { getAllColorSpaces, ColorSpaceView, getColorSpaceByType, getDefaultDistanceMetric, getDistanceMetricById } from './colorSpace.js';
 import { ColorPalette } from './colorPalette.js';
 import { ColorDisplay } from './colorDisplay.js';
 import { deferUntilAnimationFrame } from './utils.js';
@@ -238,6 +238,10 @@ class URLStateManager {
     const params = new URLSearchParams();
     params.set('space', colorSpaceView.colorSpace.getType());
     params.set(colorSpaceView.currentAxis.key, colorSpaceView.currentValue.toString());
+    if (colorSpaceView.distanceMetric !== getDefaultDistanceMetric()) {
+      params.set('d', colorSpaceView.distanceMetric.id);
+    }
+
     const regionsParam = colorSpaceView.showBoundaries ? '&regions' : '';
     const polarParam = colorSpaceView.usePolarCoordinates ? '&polar' : '';
 
@@ -259,6 +263,7 @@ class URLStateManager {
       return;
     }
 
+    coordinates = coordinates.map(coord => Math.round(coord));
     const fragment = `#${coordinates.join(',')}`;
     const newURL = `${window.location.pathname}${window.location.search}${fragment}`;
     window.history.replaceState(null, '', newURL);
@@ -291,7 +296,7 @@ class URLStateManager {
     const params = new URLSearchParams(window.location.search);
 
     // Lookup the color space, or default to the first available.
-    const spaceParam = params.get('space').toUpperCase();
+    const spaceParam = params.get('space')?.toUpperCase();
     const colorSpace = getColorSpaceByType(spaceParam) || getAllColorSpaces()[0];
 
     // Try to find axis and value by looking for axis keys in the URL parameters
@@ -305,15 +310,16 @@ class URLStateManager {
         axis = availableAxis;
         const valueIsInteger = axisValue.match(/^-?\d+$/);
         value = valueIsInteger && axis.isValidValue(Number(axisValue))
-          ? axisValue : axis.defaultValue;
+          ? Number(axisValue) : axis.defaultValue;
         break;
       }
     }
 
     const showBoundaries = params.has('regions');
     const usePolarCoordinates = params.has('polar');
+    const distanceMetric = getDistanceMetricById(params.get('d')) || getDefaultDistanceMetric();
 
-    return new ColorSpaceView(colorSpace, axis, value, showBoundaries, usePolarCoordinates);
+    return new ColorSpaceView(colorSpace, axis, value, showBoundaries, usePolarCoordinates, distanceMetric);
   }
 }
 

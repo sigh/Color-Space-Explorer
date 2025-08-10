@@ -1,5 +1,5 @@
 import { clearElement, createElement } from './utils.js';
-import { ColorSpaceView, getAllColorSpaces } from './colorSpace.js';
+import { ColorSpaceView, getAllColorSpaces, getAllDistanceMetrics, getDistanceMetricById } from './colorSpace.js';
 
 /**
  * UI controller for handling axis controls and boundaries toggle
@@ -18,6 +18,9 @@ export class UIController {
     // Polar coordinates toggle element
     this._polarToggle = container.querySelector('.polar-toggle');
 
+    // Distance metric dropdown element
+    this._distanceMetricDropdown = container.querySelector('.distance-metric-dropdown');
+
     // Callback
     this._onColorViewUpdate = onColorSpaceChange;
 
@@ -30,7 +33,12 @@ export class UIController {
       this._onColorViewUpdate();
     });
 
+    this._distanceMetricDropdown.addEventListener('change', () => {
+      this._onColorViewUpdate();
+    });
+
     this._setupColorSpaceControls(container, initialColorSpaceView);
+    this._setupDistanceMetricsDropdown();
 
     // Set the current state from the view
     this._axisSlider.value = initialColorSpaceView.currentValue;
@@ -38,6 +46,7 @@ export class UIController {
       initialColorSpaceView.currentAxis, initialColorSpaceView.currentValue);
     this._boundariesToggle.checked = initialColorSpaceView.showBoundaries;
     this._polarToggle.checked = initialColorSpaceView.usePolarCoordinates;
+    this._distanceMetricDropdown.value = initialColorSpaceView.distanceMetric.id;
   }
 
   /**
@@ -90,6 +99,22 @@ export class UIController {
       radio.addEventListener('change', () => {
         this._selectColorSpace(cs);
       });
+    });
+  }
+
+  /**
+   * Setup the distance metrics dropdown with configured options
+   */
+  _setupDistanceMetricsDropdown() {
+    // Clear existing options
+    clearElement(this._distanceMetricDropdown);
+
+    // Add options from configuration
+    getAllDistanceMetrics().forEach(metric => {
+      const option = createElement('option');
+      option.value = metric.id;
+      option.textContent = metric.displayName;
+      this._distanceMetricDropdown.appendChild(option);
     });
   }
 
@@ -196,7 +221,8 @@ export class UIController {
       this._currentAxis,
       parseInt(this._axisSlider.value),
       this._boundariesToggle.checked,
-      this._polarToggle.checked && this._colorSpace.availablePolarAxis(this._currentAxis)
+      this._polarToggle.checked && this._colorSpace.availablePolarAxis(this._currentAxis),
+      getDistanceMetricById(this._distanceMetricDropdown.value)
     );
   }
 }

@@ -193,7 +193,7 @@ export class ColorPalette {
    */
   _makePaletteSelectDropdown() {
     const dropdown = createElement('select');
-    dropdown.className = 'palette-dropdown';
+    dropdown.className = 'dropdown-control';
     this._dropdown = dropdown;
 
     // Add preset options

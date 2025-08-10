@@ -36,12 +36,13 @@ export class Axis {
  * Immutable color space view - a simple container for current axis and value
  */
 export class ColorSpaceView {
-  constructor(colorSpace, currentAxis, currentValue, showBoundaries = true, usePolarCoordinates = false) {
+  constructor(colorSpace, currentAxis, currentValue, showBoundaries = true, usePolarCoordinates = false, distanceMetric = null) {
     this.colorSpace = colorSpace;
     this.currentAxis = currentAxis;
     this.currentValue = currentValue;
     this.showBoundaries = showBoundaries;
     this.usePolarCoordinates = usePolarCoordinates;
+    this.distanceMetric = distanceMetric || getDefaultDistanceMetric();
 
     // Freeze the object to make it immutable
     Object.freeze(this);
@@ -245,4 +246,52 @@ export class HsvColor extends Color {
  */
 export class HslColor extends Color {
   static colorSpace = HslColorSpace;
+}
+
+/**
+ * Distance metric class
+ */
+export class DistanceMetric {
+  /**
+   * @param {string} id - The unique identifier for the distance metric
+   * @param {string} displayName - The human-readable name for the metric
+   */
+  constructor(id, displayName) {
+    this.id = id;
+    this.displayName = displayName;
+    Object.freeze(this);
+  }
+}
+
+/**
+ * Distance metric configuration
+ */
+const DISTANCE_METRICS = Object.freeze([
+  new DistanceMetric('lab', 'L*a*b* (Delta E)'),
+  new DistanceMetric('rgb', 'RGB (Euclidean)')
+]);
+
+/**
+ * Get all available distance metrics
+ * @returns {Array<DistanceMetric>} Array of distance metric objects
+ */
+export function getAllDistanceMetrics() {
+  return DISTANCE_METRICS;
+}
+
+/**
+ * Get the default distance metric (first in the list)
+ * @returns {DistanceMetric} Default distance metric object
+ */
+export function getDefaultDistanceMetric() {
+  return DISTANCE_METRICS[0];
+}
+
+/**
+ * Find a distance metric by its ID
+ * @param {string} metricId - The ID of the distance metric
+ * @returns {DistanceMetric|null} The distance metric object or null if not found
+ */
+export function getDistanceMetricById(metricId) {
+  return DISTANCE_METRICS.find(metric => metric.id === metricId) || null;
 }

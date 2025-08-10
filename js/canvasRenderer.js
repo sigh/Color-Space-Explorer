@@ -1,4 +1,4 @@
-import { getAllColorSpaces, RgbColor } from "./colorSpace.js";
+import { getAllColorSpaces, RgbColor, getAllDistanceMetrics } from "./colorSpace.js";
 import { clearElement, createElement } from "./utils.js";
 import { MAX_PALETTE_COLORS } from "./colorPalette.js";
 
@@ -71,6 +71,7 @@ export class CanvasRenderer {
       paletteColorsLocation: gl.getUniformLocation(computeProgram, 'u_paletteColors'),
       paletteCountLocation: gl.getUniformLocation(computeProgram, 'u_paletteCount'),
       polarCoordinateAxisLocation: gl.getUniformLocation(computeProgram, 'u_polarCoordinateAxis'),
+      distanceMetricLocation: gl.getUniformLocation(computeProgram, 'u_distanceMetric'),
     };
 
     // Create and configure render program
@@ -229,6 +230,11 @@ export class CanvasRenderer {
     gl.uniform1i(this._compute.axisIndexLocation, colorSpaceView.colorSpace.getAxisIndex(colorSpaceView.currentAxis));
     gl.uniform1f(this._compute.fixedValueLocation, colorSpaceView.currentValue / colorSpaceView.currentAxis.max);
     gl.uniform1i(this._compute.colorSpaceIndexLocation, getAllColorSpaces().indexOf(colorSpaceView.colorSpace));
+
+    // Set distance metric uniform (index based on getAllDistanceMetrics order)
+    gl.uniform1i(
+      this._compute.distanceMetricLocation,
+      getAllDistanceMetrics().indexOf(colorSpaceView.distanceMetric));
 
     // Set polar coordinates uniform
     const polarCoordinateAxis = polarAxis !== null ?

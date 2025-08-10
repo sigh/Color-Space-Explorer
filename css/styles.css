@@ -140,7 +140,7 @@ h3 {
 
 /* Common interactive elements */
 .segmented-control,
-.palette-dropdown,
+.dropdown-control,
 .color-item {
   background: var(--bg-surface);
   border: 1px solid var(--bg-surface-hover);
@@ -154,7 +154,7 @@ h3 {
   gap: 2px;
 }
 
-.palette-dropdown {
+.dropdown-control {
   color: var(--text-secondary);
   font-size: 12px;
   padding: 8px 12px;
@@ -162,11 +162,11 @@ h3 {
   outline: none;
 }
 
-.palette-dropdown:hover {
+.dropdown-control:hover {
   border-color: var(--border-hover);
 }
 
-.palette-dropdown:focus {
+.dropdown-control:focus {
   border-color: var(--border-focus);
 }
 
