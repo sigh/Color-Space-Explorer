@@ -18,17 +18,47 @@ const float COLOR_INDEX_SCALE = 255.0;
 const vec4 OUTSIDE_COLOR_SPACE = vec4(0.0, 0.0, 0.0, 255.0/COLOR_INDEX_SCALE);
 const int NO_MATCHING_COLOR = 254; // Use 254 to distinguish from OUTSIDE_COLOR_SPACE (255)
 
-vec3 hsvToRgb(float h, float s, float v) {
+// Convert a pure hue to RGB color space
+// For any given hue:
+//   one component will be 1, one will be 0, and the third will be somewhere in between.
+vec3 hueToRgb(float h) {
+  // References:
+  //  https://en.wikipedia.org/wiki/HSL_and_HSV#HSV_to_RGB
+  //  https://gist.github.com/983/e170a24ae8eba2cd174f
+  //  https://gist.github.com/unitycoder/aaf94ddfe040ec2da93b58d3c65ab9d9
+
+  // k contains offsets to align hue with each RGB component.
+  // For a given component, it maps a pure hue to 1.0.
   vec3 k = vec3(1.0, 2.0/3.0, 1.0/3.0);
+
+  // let offsetHue = fract(h + k)
+  // The closer offsetHue is to 0.0 (or 1.0), the closer hue is to that component.
+  // We scale this so p[i] is a triangle wave with peaks at 1.0 and troughs at 0.5.
   vec3 p = abs(fract(h + k) * 6.0 - 3.0);
-  return v * mix(k.xxx, clamp(p - k.xxx, 0.0, 1.0), s);
+
+  // By shifting the wave down an clamping it, we ensure the wave:
+  //   - Saturates at 1.0 for hues close to the component
+  //   - Saturates at 0.0 for hues far from the component
+  //   - Has a linear transition in between
+  return clamp(p - 1.0, 0.0, 1.0);
 }
 
+// Convert HSV to RGB color space
+vec3 hsvToRgb(float h, float s, float v) {
+  // References:
+  //  https://en.wikipedia.org/wiki/HSL_and_HSV#HSV_to_RGB
+  //  https://gist.github.com/unitycoder/aaf94ddfe040ec2da93b58d3c65ab9d9
+
+  return v * (hueToRgb(h)*s - s + 1.0);
+}
+
+// Convert HSL to RGB color space
 vec3 hslToRgb(float h, float s, float l) {
+  // Reference: https://en.wikipedia.org/wiki/HSL_and_HSV#HSL_to_RGB
+  // https://gist.github.com/unitycoder/aaf94ddfe040ec2da93b58d3c65ab9d9
+
   float c = (1.0 - abs(2.0 * l - 1.0)) * s;
-  vec3 k = vec3(1.0, 2.0/3.0, 1.0/3.0);
-  vec3 p = abs(fract(h + k) * 6.0 - 3.0);
-  return l + c * (clamp(p - 1.0, 0.0, 1.0) - 0.5);
+  return l + c * (hueToRgb(h) - 0.5);
 }
 
 // Convert RGB to XYZ color space (D65 illuminant)
