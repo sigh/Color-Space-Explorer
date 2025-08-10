@@ -7,13 +7,16 @@ uniform int u_colorSpaceIndex; // 0=RGB, 1=HSV, 2=HSL
 uniform int u_axisIndex; // Ordered as the color-space initials.
 uniform int u_polarCoordinateAxis; // Index of axis to convert to angle (-1 = no polar coordinates)
 uniform int u_distanceMetric; // 0=Delta E (LAB), 1=RGB Euclidean
+uniform float u_distanceThreshold; // Maximum distance for color matching
 
 const int MAX_PALETTE_COLORS = 200;
 uniform vec3 u_paletteColors[MAX_PALETTE_COLORS]; // Maximum palette colors
 uniform int u_paletteCount;
 
 // Use alpha=1.0 (255) to signal coordinates outside the color space
-const vec4 OUTSIDE_COLOR_SPACE = vec4(0.0, 0.0, 0.0, 1.0);
+const float COLOR_INDEX_SCALE = 255.0;
+const vec4 OUTSIDE_COLOR_SPACE = vec4(0.0, 0.0, 0.0, 255.0/COLOR_INDEX_SCALE);
+const int NO_MATCHING_COLOR = 254; // Use 254 to distinguish from OUTSIDE_COLOR_SPACE (255)
 
 vec3 hsvToRgb(float h, float s, float v) {
   vec3 k = vec3(1.0, 2.0/3.0, 1.0/3.0);
@@ -104,10 +107,10 @@ float distance2(vec3 v1, vec3 v2) {
   return dot(diff, diff);
 }
 
-// Returns the index of the closest palette color
+// Returns the index of the closest palette color within threshold, or NO_MATCHING_COLOR if none
 int findClosestPaletteIndex(vec3 color) {
-  float minDistance2 = 1000000.0;
-  int closestIndex = 0;
+  int closestIndex = NO_MATCHING_COLOR;
+  float minDistance2 = u_distanceThreshold * u_distanceThreshold;
 
   for (int i = 0; i < MAX_PALETTE_COLORS; i++) {
     if (i >= u_paletteCount) break;
@@ -128,6 +131,7 @@ int findClosestPaletteIndex(vec3 color) {
       closestIndex = i;
     }
   }
+
   return closestIndex;
 }
 
@@ -180,7 +184,7 @@ void main() {
 
   // Store closest index as alpha (normalized to 0-1 range)
   int closestIndex = findClosestPaletteIndex(color);
-  float alpha = float(closestIndex) / 255.0;
+  float alpha = float(closestIndex) / COLOR_INDEX_SCALE;
 
   fragColor = vec4(color, alpha);
 }

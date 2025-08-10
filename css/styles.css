@@ -275,14 +275,13 @@ h3 {
   color: var(--text-danger);
 }
 
-/* Form controls */
 .slider-container {
   display: flex;
   align-items: center;
   gap: 12px;
 }
 
-.value-slider {
+.slider-container input {
   flex: 1;
   height: 6px;
   border-radius: var(--radius-slider);
@@ -293,7 +292,7 @@ h3 {
   appearance: none;
 }
 
-.axis-slider-value {
+.slider-container span {
   color: var(--text-secondary);
   font-family: var(--font-mono);
   font-size: 12px;

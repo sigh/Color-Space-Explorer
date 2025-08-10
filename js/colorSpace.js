@@ -36,13 +36,14 @@ export class Axis {
  * Immutable color space view - a simple container for current axis and value
  */
 export class ColorSpaceView {
-  constructor(colorSpace, currentAxis, currentValue, showBoundaries = true, usePolarCoordinates = false, distanceMetric = null) {
+  constructor(colorSpace, currentAxis, currentValue, showBoundaries = true, usePolarCoordinates = false, distanceMetric = null, distanceThreshold = null) {
     this.colorSpace = colorSpace;
     this.currentAxis = currentAxis;
     this.currentValue = currentValue;
     this.showBoundaries = showBoundaries;
     this.usePolarCoordinates = usePolarCoordinates;
     this.distanceMetric = distanceMetric || getDefaultDistanceMetric();
+    this.distanceThreshold = distanceThreshold ?? this.distanceMetric.maxThreshold;
 
     // Freeze the object to make it immutable
     Object.freeze(this);
@@ -255,11 +256,29 @@ export class DistanceMetric {
   /**
    * @param {string} id - The unique identifier for the distance metric
    * @param {string} displayName - The human-readable name for the metric
+   * @param {number} minThreshold - Minimum threshold value for the metric
+   * @param {number} maxThreshold - Maximum threshold value for the metric (also default)
    */
-  constructor(id, displayName) {
+  constructor(id, displayName, minThreshold, maxThreshold) {
     this.id = id;
     this.displayName = displayName;
+    this.minThreshold = minThreshold;
+    this.maxThreshold = maxThreshold;
+
+    // Precalculate logarithmic values for slider conversion
+    this.logMinThreshold = Math.log(minThreshold);
+    this.logMaxThreshold = Math.log(maxThreshold);
+    this.logRange = this.logMaxThreshold - this.logMinThreshold;
+
     Object.freeze(this);
+  }
+
+  /**
+   * Convert a value from the metric's range to a string representation
+   * @param {number} threshold - The threshold value to convert
+   */
+  thresholdToString(threshold) {
+    return threshold > 10 ? threshold.toFixed(0) : threshold.toPrecision(2);
   }
 }
 
@@ -267,8 +286,10 @@ export class DistanceMetric {
  * Distance metric configuration
  */
 const DISTANCE_METRICS = Object.freeze([
-  new DistanceMetric('lab', 'L*a*b* (Delta E)'),
-  new DistanceMetric('rgb', 'RGB (Euclidean)')
+  // Delta E: typical values range from 0-100, with 1-5 being perceptually similar
+  new DistanceMetric('lab-d', 'L*a*b* (Delta E)', 0.1, 100.0),
+  // RGB Euclidean: values range from 0-√3 ≈ 1.732, with 0.1 being very similar
+  new DistanceMetric('rgb-d', 'RGB (Euclidean)', 0.01, 1.0)
 ]);
 
 /**

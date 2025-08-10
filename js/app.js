@@ -1,6 +1,6 @@
 import { CanvasRenderer } from './canvasRenderer.js';
 import { UIController } from './uiController.js';
-import { getAllColorSpaces, ColorSpaceView, getColorSpaceByType, getDefaultDistanceMetric, getDistanceMetricById } from './colorSpace.js';
+import { getAllColorSpaces, getAllDistanceMetrics, ColorSpaceView, getColorSpaceByType, getDefaultDistanceMetric } from './colorSpace.js';
 import { ColorPalette } from './colorPalette.js';
 import { ColorDisplay } from './colorDisplay.js';
 import { deferUntilAnimationFrame } from './utils.js';
@@ -238,11 +238,12 @@ class URLStateManager {
     const params = new URLSearchParams();
     params.set('space', colorSpaceView.colorSpace.getType());
     params.set(colorSpaceView.currentAxis.key, colorSpaceView.currentValue.toString());
-    if (colorSpaceView.distanceMetric !== getDefaultDistanceMetric()) {
-      params.set('d', colorSpaceView.distanceMetric.id);
-    }
+    const distanceMetric = colorSpaceView.distanceMetric;
+    params.set(
+      distanceMetric.id,
+      distanceMetric.thresholdToString(colorSpaceView.distanceThreshold));
 
-    const regionsParam = colorSpaceView.showBoundaries ? '&regions' : '';
+    const regionsParam = colorSpaceView.showBoundaries ? '' : '&noregions';
     const polarParam = colorSpaceView.usePolarCoordinates ? '&polar' : '';
 
     const fragment = window.location.hash;
@@ -315,11 +316,25 @@ class URLStateManager {
       }
     }
 
-    const showBoundaries = params.has('regions');
+    const showBoundaries = !params.has('noregions');
     const usePolarCoordinates = params.has('polar');
-    const distanceMetric = getDistanceMetricById(params.get('d')) || getDefaultDistanceMetric();
 
-    return new ColorSpaceView(colorSpace, axis, value, showBoundaries, usePolarCoordinates, distanceMetric);
+    // Look for distance metric and threshold in URL parameters
+    let distanceMetric = getDefaultDistanceMetric();
+    let threshold = distanceMetric.maxThreshold;
+
+    // Check each available distance metric to see if it's in the URL
+    for (const metric of getAllDistanceMetrics()) {
+      const thresholdValue = params.get(metric.id);
+      if (thresholdValue !== null) {
+        distanceMetric = metric;
+        const parsedThreshold = parseFloat(thresholdValue);
+        threshold = !isNaN(parsedThreshold) ? parsedThreshold : metric.maxThreshold;
+        break;
+      }
+    }
+
+    return new ColorSpaceView(colorSpace, axis, value, showBoundaries, usePolarCoordinates, distanceMetric, threshold);
   }
 }
 

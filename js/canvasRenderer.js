@@ -72,6 +72,7 @@ export class CanvasRenderer {
       paletteCountLocation: gl.getUniformLocation(computeProgram, 'u_paletteCount'),
       polarCoordinateAxisLocation: gl.getUniformLocation(computeProgram, 'u_polarCoordinateAxis'),
       distanceMetricLocation: gl.getUniformLocation(computeProgram, 'u_distanceMetric'),
+      distanceThresholdLocation: gl.getUniformLocation(computeProgram, 'u_distanceThreshold'),
     };
 
     // Create and configure render program
@@ -235,6 +236,9 @@ export class CanvasRenderer {
     gl.uniform1i(
       this._compute.distanceMetricLocation,
       getAllDistanceMetrics().indexOf(colorSpaceView.distanceMetric));
+
+    // Set distance threshold uniform
+    gl.uniform1f(this._compute.distanceThresholdLocation, colorSpaceView.distanceThreshold);
 
     // Set polar coordinates uniform
     const polarCoordinateAxis = polarAxis !== null ?

@@ -21,6 +21,10 @@ export class UIController {
     // Distance metric dropdown element
     this._distanceMetricDropdown = container.querySelector('.distance-metric-dropdown');
 
+    // Distance threshold slider elements
+    this._distanceThresholdSlider = container.querySelector('.distance-threshold-slider');
+    this._distanceThresholdLabel = container.querySelector('.distance-threshold-value');
+
     // Callback
     this._onColorViewUpdate = onColorSpaceChange;
 
@@ -34,11 +38,18 @@ export class UIController {
     });
 
     this._distanceMetricDropdown.addEventListener('change', () => {
+      this._updateDistanceThresholdLabel();
+      this._onColorViewUpdate();
+    });
+
+    this._distanceThresholdSlider.addEventListener('input', () => {
+      this._updateDistanceThresholdLabel();
       this._onColorViewUpdate();
     });
 
     this._setupColorSpaceControls(container, initialColorSpaceView);
-    this._setupDistanceMetricsDropdown();
+    this._setupDistanceMetricsDropdown(initialColorSpaceView.distanceMetric);
+    this._setupDistanceThresholdSlider(initialColorSpaceView);
 
     // Set the current state from the view
     this._axisSlider.value = initialColorSpaceView.currentValue;
@@ -46,7 +57,6 @@ export class UIController {
       initialColorSpaceView.currentAxis, initialColorSpaceView.currentValue);
     this._boundariesToggle.checked = initialColorSpaceView.showBoundaries;
     this._polarToggle.checked = initialColorSpaceView.usePolarCoordinates;
-    this._distanceMetricDropdown.value = initialColorSpaceView.distanceMetric.id;
   }
 
   /**
@@ -104,8 +114,9 @@ export class UIController {
 
   /**
    * Setup the distance metrics dropdown with configured options
+   * @param {DistanceMetric} initialMetric - The initial distance metric to select
    */
-  _setupDistanceMetricsDropdown() {
+  _setupDistanceMetricsDropdown(initialMetric) {
     // Clear existing options
     clearElement(this._distanceMetricDropdown);
 
@@ -114,8 +125,37 @@ export class UIController {
       const option = createElement('option');
       option.value = metric.id;
       option.textContent = metric.displayName;
+
       this._distanceMetricDropdown.appendChild(option);
     });
+
+    this._distanceMetricDropdown.value = initialMetric.id;
+  }
+
+  /**
+   * Set distance threshold slider from a ColorSpaceView
+   * @param {ColorSpaceView} view - The color space view containing threshold
+   */
+  _setupDistanceThresholdSlider(view) {
+    this._distanceThresholdSlider.min = 0;
+    this._distanceThresholdSlider.max = 100;
+    this._distanceThresholdSlider.step = 1;
+
+    const logValue = toLogThreshold(view.distanceMetric, view.distanceThreshold);
+
+    this._distanceThresholdSlider.value = logValue;
+
+    this._updateDistanceThresholdLabel();
+  }
+
+  /**
+   * Update the distance threshold label based on current slider value
+   */
+  _updateDistanceThresholdLabel() {
+    const metric = getDistanceMetricById(this._distanceMetricDropdown.value);
+    const threshold = fromLogThreshold(metric, this._distanceThresholdSlider.value);
+
+    this._distanceThresholdLabel.textContent = metric.thresholdToString(threshold);
   }
 
   /**
@@ -216,13 +256,42 @@ export class UIController {
    * @returns {ColorSpaceView} Current color space view
    */
   getCurrentColorSpaceView() {
+    const metric = getDistanceMetricById(this._distanceMetricDropdown.value);
+    const threshold = fromLogThreshold(metric, this._distanceThresholdSlider.value);
+
     return new ColorSpaceView(
       this._colorSpace,
       this._currentAxis,
       parseInt(this._axisSlider.value),
       this._boundariesToggle.checked,
       this._polarToggle.checked && this._colorSpace.availablePolarAxis(this._currentAxis),
-      getDistanceMetricById(this._distanceMetricDropdown.value)
+      metric,
+      threshold
     );
   }
+}
+
+
+/**
+ * Convert a threshold value to a logarithmic scale
+ * @param {DistanceMetric} metric - The distance metric
+ * @param {number} threshold - The threshold value
+ * @returns {number} The logarithmic scale value
+ */
+function toLogThreshold(metric, threshold) {
+  const logThreshold = Math.log(Math.max(metric.minThreshold, Math.min(metric.maxThreshold, threshold)));
+  const logValue = ((logThreshold - metric.logMinThreshold) / metric.logRange) * 100;
+  return logValue;
+}
+
+/**
+ * Convert linear slider value (0-100) to logarithmic threshold value
+ * @param {DistanceMetric} metric - The distance metric
+ * @param {number} value - The linear slider value
+ * @returns {number} The logarithmic threshold value
+ */
+function fromLogThreshold(metric, value) {
+  const logValue = metric.logMinThreshold + (value / 100) * metric.logRange;
+  const threshold = Math.exp(logValue);
+  return threshold;
 }
