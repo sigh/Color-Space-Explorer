@@ -1,6 +1,7 @@
 import { CanvasRenderer } from './canvasRenderer.js';
+import { CubeRenderer } from './cubeRenderer.js';
 import { UIController } from './uiController.js';
-import { getAllColorSpaces, getAllDistanceMetrics, ColorSpaceView, getColorSpaceByType, getDefaultDistanceMetric } from './colorSpace.js';
+import { getAllColorSpaces, getAllDistanceMetrics, ColorSpaceView, getColorSpaceByType, getDefaultDistanceMetric, getDistanceMetricById } from './colorSpace.js';
 import { ColorPalette } from './colorPalette.js';
 import { ColorDisplay } from './colorDisplay.js';
 import { deferUntilAnimationFrame } from './utils.js';
@@ -39,7 +40,15 @@ class ColorSpaceExplorer {
   }
 
   async init() {
-    this._renderer = await CanvasRenderer.create(this._canvasContainer);
+    // Check URL parameter to determine renderer type
+    const params = new URLSearchParams(window.location.search);
+    const use3D = params.has('3d');
+
+    if (use3D) {
+      this._renderer = await CubeRenderer.create(this._canvasContainer);
+    } else {
+      this._renderer = await CanvasRenderer.create(this._canvasContainer);
+    }
 
     // Create a selection indicator - this will get updated as required.
     const selectionCoords = URLStateManager.deserializeSelectionFromFragment();
@@ -122,7 +131,10 @@ class ColorSpaceExplorer {
       return [x, y];
     };
 
-    // Mouse move handler for hover effect
+    // Check if we're using 3D renderer
+    const is3DRenderer = this._renderer instanceof CubeRenderer;
+
+    // Mouse move handler for hover effect (skip for 3D renderer)
     this._canvasContainer.addEventListener('mousemove', (event) => {
       // Skip hover updates if there's a selection
       if (this._selectionIndicator) return;
@@ -138,7 +150,7 @@ class ColorSpaceExplorer {
       this._colorDisplay.setColors(rgbColor, closestColor);
     });
 
-    // Mouse leave handler to reset to default
+    // Mouse leave handler to reset to default (skip for 3D renderer)
     this._canvasContainer.addEventListener('mouseleave', () => {
       // Skip clearing if there's a selection
       if (this._selectionIndicator) return;
@@ -146,9 +158,11 @@ class ColorSpaceExplorer {
       this._colorDisplay.clearColors();
     });
 
-    // Click handler for canvas panel
+    // Click handler for canvas panel (skip for 3D renderer)
     const centerPanel = document.querySelector('.canvas-panel');
     centerPanel.addEventListener('click', (event) => {
+      if (is3DRenderer) return; // Let 3D renderer handle its own mouse events
+
       const selectionClicked = event.target === this._selectionIndicator;
       const [x, y] = getCanvasCoordsFromMouseEvent(event);
       const [rgbColor, closestColor] = this._renderer.getColorAt(x, y);
@@ -246,8 +260,11 @@ class URLStateManager {
     const regionsParam = colorSpaceView.showBoundaries ? '' : '&noregions';
     const polarParam = colorSpaceView.usePolarCoordinates ? '&polar' : '';
 
+    // Preserve the 3d parameter if it exists
+    const current3dParam = new URLSearchParams(window.location.search).has('3d') ? '&3d' : '';
+
     const fragment = window.location.hash;
-    const newURL = `${window.location.pathname}?${params.toString()}${regionsParam}${polarParam}${fragment}`;
+    const newURL = `${window.location.pathname}?${params.toString()}${regionsParam}${polarParam}${current3dParam}${fragment}`;
 
     window.history.replaceState(null, '', newURL);
   }
