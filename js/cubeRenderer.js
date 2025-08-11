@@ -70,11 +70,11 @@ export class CubeRenderer {
    * @returns {Promise<CubeRenderer>} - Promise that resolves to initialized renderer
    */
   static async create(canvasContainer) {
-    // Load shaders from files - reuse render shaders from CanvasRenderer
-    const [cubeVertexShaderSource, cubeComputeFragmentShaderSource, vertexShaderSource, renderFragmentShaderSource] = await Promise.all([
-      fetch('./shaders/cube_vertex.glsl').then(r => r.text()),
-      fetch('./shaders/cube_compute_fragment.glsl').then(r => r.text()),
-      fetch('./shaders/vertex.glsl').then(r => r.text()),
+    // Load shaders from files - now using shared compute_fragment.glsl
+    const [computeVertexShaderSource, computeFragmentShaderSource, renderVertexShaderSource, renderFragmentShaderSource] = await Promise.all([
+      fetch('./shaders/compute_vertex.glsl').then(r => r.text()),
+      fetch('./shaders/compute_fragment.glsl').then(r => r.text()),
+      fetch('./shaders/render_vertex.glsl').then(r => r.text()),
       fetch('./shaders/render_fragment.glsl').then(r => r.text())
     ]);
 
@@ -82,7 +82,7 @@ export class CubeRenderer {
     const renderer = new CubeRenderer(canvasContainer);
 
     // Initialize WebGL with shaders
-    renderer._initWebGL(cubeVertexShaderSource, cubeComputeFragmentShaderSource, vertexShaderSource, renderFragmentShaderSource);
+    renderer._initWebGL(computeVertexShaderSource, computeFragmentShaderSource, renderVertexShaderSource, renderFragmentShaderSource);
 
     return renderer;
   }
@@ -90,22 +90,24 @@ export class CubeRenderer {
   /**
    * Initialize WebGL shaders and buffers
    */
-  _initWebGL(cubeVertexShaderSource, cubeComputeFragmentShaderSource, vertexShaderSource, renderFragmentShaderSource) {
+  _initWebGL(computeVertexShaderSource, computeFragmentShaderSource, renderVertexShaderSource, renderFragmentShaderSource) {
     const gl = this._gl;
 
     // Enable depth testing for 3D
     gl.enable(gl.DEPTH_TEST);
 
     // Create compute program for color space calculations (3D cube rendering)
-    const cubeVertexShader = this._createShader(gl.VERTEX_SHADER, cubeVertexShaderSource);
-    const computeFragmentShader = this._createShader(gl.FRAGMENT_SHADER, cubeComputeFragmentShaderSource);
+    const computeVertexShader = this._createShader(gl.VERTEX_SHADER, computeVertexShaderSource);
+    const computeFragmentShader = this._createShader(gl.FRAGMENT_SHADER, computeFragmentShaderSource);
 
-    const computeProgram = this._createProgram(cubeVertexShader, computeFragmentShader);
+    const computeProgram = this._createProgram(computeVertexShader, computeFragmentShader);
     this._compute = {
       program: computeProgram,
       positionLocation: gl.getAttribLocation(computeProgram, 'a_position'),
       colorCoordLocation: gl.getAttribLocation(computeProgram, 'a_colorCoord'),
       modelViewProjectionLocation: gl.getUniformLocation(computeProgram, 'u_modelViewProjection'),
+      variableAxesLocation: gl.getUniformLocation(computeProgram, 'u_variableAxes'),
+      polarAngleAxisLocation: gl.getUniformLocation(computeProgram, 'u_polarAngleAxis'),
       colorSpaceIndexLocation: gl.getUniformLocation(computeProgram, 'u_colorSpaceIndex'),
       paletteColorsLocation: gl.getUniformLocation(computeProgram, 'u_paletteColors'),
       paletteCountLocation: gl.getUniformLocation(computeProgram, 'u_paletteCount'),
@@ -114,10 +116,10 @@ export class CubeRenderer {
     };
 
     // Create render program for displaying framebuffer texture (reuse CanvasRenderer approach)
-    const vertexShader = this._createShader(gl.VERTEX_SHADER, vertexShaderSource);
+    const renderVertexShader = this._createShader(gl.VERTEX_SHADER, renderVertexShaderSource);
     const renderFragmentShader = this._createShader(gl.FRAGMENT_SHADER, renderFragmentShaderSource);
 
-    const renderProgram = this._createProgram(vertexShader, renderFragmentShader);
+    const renderProgram = this._createProgram(renderVertexShader, renderFragmentShader);
     this._render = {
       program: renderProgram,
       positionLocation: gl.getAttribLocation(renderProgram, 'a_position'),
@@ -312,7 +314,7 @@ export class CubeRenderer {
       // Re-render both framebuffer and canvas when rotating
       if (this._currentColorSpaceView && this._currentPaletteColors) {
         this._renderToFramebuffer(this._currentColorSpaceView, this._currentPaletteColors);
-        this._renderToCanvas(this._currentHighlightPaletteIndex);
+        this._renderToCanvas(this._currentColorSpaceView.showBoundaries, this._currentHighlightPaletteIndex);
       }
 
       e.stopPropagation();
@@ -382,7 +384,7 @@ export class CubeRenderer {
     this._renderToFramebuffer(colorSpaceView, paletteColors);
 
     // Second render: display framebuffer texture to canvas
-    this._renderToCanvas(highlightPaletteIndex);
+    this._renderToCanvas(colorSpaceView.showBoundaries, highlightPaletteIndex);
   }
 
   /**
@@ -421,6 +423,13 @@ export class CubeRenderer {
     // Set transformation matrix uniform
     gl.uniformMatrix4fv(this._compute.modelViewProjectionLocation, false, mvpMatrix);
 
+    // For 3D cube rendering, we don't slice along any axis, so no variable axes needed
+    // Set variable axes to [0,1] as default (not used since no polar coordinates in 3D cube)
+    gl.uniform2iv(this._compute.variableAxesLocation, [0, 1]);
+
+    // No polar coordinates for 3D cube rendering
+    gl.uniform1i(this._compute.polarAngleAxisLocation, -1);
+
     // Set color space uniforms
     gl.uniform1i(this._compute.colorSpaceIndexLocation, getAllColorSpaces().indexOf(colorSpaceView.colorSpace));
 
@@ -453,9 +462,10 @@ export class CubeRenderer {
 
   /**
    * Render framebuffer texture to canvas for display
+   * @param {boolean} showBoundaries - Whether to show region boundaries
    * @param {number|null} highlightPaletteIndex - Index of palette color to highlight (null for no highlight)
    */
-  _renderToCanvas(highlightPaletteIndex = null) {
+  _renderToCanvas(showBoundaries = true, highlightPaletteIndex = null) {
     const gl = this._gl;
 
     // Bind default framebuffer (canvas)
@@ -475,8 +485,8 @@ export class CubeRenderer {
     gl.bindTexture(gl.TEXTURE_2D, this._colorTexture);
     gl.uniform1i(this._render.colorTextureLocation, 0);
 
-    // Set boundaries visibility uniform (always show boundaries for 3D)
-    gl.uniform1i(this._render.showBoundariesLocation, 1);
+    // Set boundaries visibility uniform (use showBoundaries parameter)
+    gl.uniform1i(this._render.showBoundariesLocation, showBoundaries ? 1 : 0);
 
     // Set highlight palette index uniform (convert null to -1 for shader)
     gl.uniform1i(this._render.highlightPaletteIndexLocation, highlightPaletteIndex ?? -1);
