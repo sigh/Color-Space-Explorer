@@ -1,11 +1,10 @@
 #version 300 es
 precision mediump float;
-in vec2 v_texCoord;
+in vec3 v_colorCoord;
 out vec4 fragColor;
-uniform float u_fixedValue;
 uniform int u_colorSpaceIndex; // 0=RGB, 1=HSV, 2=HSL
-uniform int u_axisIndex; // Ordered as the color-space initials.
-uniform int u_polarCoordinateAxis; // Index of axis to convert to angle (-1 = no polar coordinates)
+uniform ivec2 u_variableAxes; // The two variable axis indices (e.g. [1,2] if axis 0 is fixed)
+uniform int u_polarAngleAxis; // Index of axis to convert to angle (-1 = no polar coordinates)
 uniform int u_distanceMetric; // 0=Delta E (LAB), 1=RGB Euclidean
 uniform float u_distanceThreshold; // Maximum distance for color matching
 
@@ -166,11 +165,14 @@ int findClosestPaletteIndex(vec3 color) {
 }
 
 void main() {
-  vec2 texCoord = v_texCoord;
+  vec3 colorCoord = v_colorCoord;
 
   // Apply polar coordinate transformation if enabled
-  if (u_polarCoordinateAxis >= 0) {
-    vec2 polarCoord = cartesianToPolar(v_texCoord);
+  if (u_polarAngleAxis >= 0) {
+    // Extract the two variable axes directly
+    vec2 texCoord = vec2(colorCoord[u_variableAxes.x], colorCoord[u_variableAxes.y]);
+
+    vec2 polarCoord = cartesianToPolar(texCoord);
 
     // Check if we're outside the valid coordinate space (radius > 1)
     if (polarCoord.x > 1.0) {
@@ -178,26 +180,14 @@ void main() {
       return;
     }
 
-    // Get the first variable axis (the one not fixed)
-    int firstVariableAxis = (u_axisIndex == 0) ? 1 : 0;
-
-    // Map angle and radius to the correct coordinates
-    // If polarCoordinateAxis is the first variable axis, it gets the angle
-    if (u_polarCoordinateAxis == firstVariableAxis) {
-      texCoord = vec2(polarCoord.y, polarCoord.x); // angle, radius
-    } else {
-      texCoord = vec2(polarCoord.x, polarCoord.y); // radius, angle
+    // Determine which variable axis gets radius vs angle
+    if (u_polarAngleAxis == u_variableAxes.x) {
+      polarCoord = polarCoord.yx; // Swap to match variable axes order
     }
-  }
 
-  vec3 colorCoord;
-
-  if (u_axisIndex == 0) {
-    colorCoord = vec3(u_fixedValue, texCoord.x, texCoord.y);
-  } else if (u_axisIndex == 1) {
-    colorCoord = vec3(texCoord.x, u_fixedValue, texCoord.y);
-  } else {
-    colorCoord = vec3(texCoord.x, texCoord.y, u_fixedValue);
+    // First variable axis is angle, second is radius
+    colorCoord[u_variableAxes.x] = polarCoord.x;
+    colorCoord[u_variableAxes.y] = polarCoord.y;
   }
 
   vec3 color;
