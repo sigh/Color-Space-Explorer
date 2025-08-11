@@ -2,13 +2,17 @@ import { getAllColorSpaces, RgbColor, getAllDistanceMetrics } from "./colorSpace
 import { clearElement, createElement } from "./utils.js";
 import { MAX_PALETTE_COLORS } from "./colorPalette.js";
 
+// Import gl-matrix for efficient matrix operations
+import '../lib/gl-matrix-min.js';
+const { mat4 } = glMatrix;
+
 const OUTSIDE_COLOR_SPACE = 255;
 
 /**
  * WebGL2 Canvas renderer for color spaces with framebuffer rendering
  */
 export class CanvasRenderer {
-  constructor(canvasContainer, vertexShaderSource, computeFragmentShaderSource, renderFragmentShaderSource) {
+  constructor(canvasContainer, computeVertexShaderSource, computeFragmentShaderSource, vertexShaderSource, renderFragmentShaderSource) {
     const canvas = canvasContainer.querySelector('canvas');
     this._gl = canvas.getContext('webgl2', { preserveDrawingBuffer: true });
 
@@ -20,12 +24,29 @@ export class CanvasRenderer {
     this._height = canvas.height;
     this._paletteColors = []; // The palette colors used for indexing.
 
+    // Add 3D transformation support
+    this._rotationMatrix = mat4.create();
+    this._viewMatrix = mat4.create();
+    this._projectionMatrix = mat4.create();
+
     // Create axis container for labels and tick marks
     this._axisContainer = document.createElement('div');
     this._axisContainer.className = 'axis-container';
     canvasContainer.appendChild(this._axisContainer);
 
-    this._initWebGL(vertexShaderSource, computeFragmentShaderSource, renderFragmentShaderSource);
+    this._initWebGL(computeVertexShaderSource, computeFragmentShaderSource, vertexShaderSource, renderFragmentShaderSource);
+    this._setupCamera();
+  }
+
+  /**
+   * Setup camera matrices for 3D face rendering
+   */
+  _setupCamera() {
+    // Set up view matrix (camera looking at origin)
+    mat4.lookAt(this._viewMatrix, [0, 0, 2.0], [0, 0, 0], [0, 1, 0]);
+
+    // Set up projection matrix
+    mat4.perspective(this._projectionMatrix, Math.PI / 3, this._width / this._height, 0.1, 100.0);
   }
 
   /**
@@ -34,43 +55,49 @@ export class CanvasRenderer {
    * @returns {Promise<CanvasRenderer>} - Promise that resolves to initialized renderer
    */
   static async create(canvasContainer) {
-    // Load shaders from files
-    const [vertexShaderSource, computeFragmentShaderSource, renderFragmentShaderSource] = await Promise.all([
-      fetch('./shaders/vertex.glsl').then(r => r.text()),
+    // Load shaders from files - using original compute_fragment.glsl
+    const [computeVertexShaderSource, computeFragmentShaderSource, vertexShaderSource, renderFragmentShaderSource] = await Promise.all([
+      fetch('./shaders/cube_vertex.glsl').then(r => r.text()),
       fetch('./shaders/compute_fragment.glsl').then(r => r.text()),
+      fetch('./shaders/vertex.glsl').then(r => r.text()),
       fetch('./shaders/render_fragment.glsl').then(r => r.text())
     ]);
 
     return new CanvasRenderer(
       canvasContainer,
-      vertexShaderSource,
+      computeVertexShaderSource,
       computeFragmentShaderSource,
+      vertexShaderSource,
       renderFragmentShaderSource);
   }
 
   /**
    * Initialize WebGL shaders and buffers
    */
-  _initWebGL(vertexShaderSource, computeFragmentShaderSource, renderFragmentShaderSource) {
+  _initWebGL(computeVertexShaderSource, computeFragmentShaderSource, vertexShaderSource, renderFragmentShaderSource) {
     const gl = this._gl;
 
+    // Enable depth testing for 3D
+    gl.enable(gl.DEPTH_TEST);
+
     // Create and compile shaders
-    const vertexShader = this._createShader(gl.VERTEX_SHADER, vertexShaderSource);
+    const computeVertexShader = this._createShader(gl.VERTEX_SHADER, computeVertexShaderSource);
     const computeFragmentShader = this._createShader(gl.FRAGMENT_SHADER, computeFragmentShaderSource);
+    const vertexShader = this._createShader(gl.VERTEX_SHADER, vertexShaderSource);
     const renderFragmentShader = this._createShader(gl.FRAGMENT_SHADER, renderFragmentShaderSource);
 
-    // Create and configure compute program
-    const computeProgram = this._createProgram(vertexShader, computeFragmentShader);
+    // Create and configure compute program (3D face rendering with original compute_fragment.glsl)
+    const computeProgram = this._createProgram(computeVertexShader, computeFragmentShader);
     this._compute = {
       program: computeProgram,
       positionLocation: gl.getAttribLocation(computeProgram, 'a_position'),
-      texCoordLocation: gl.getAttribLocation(computeProgram, 'a_texCoord'),
-      fixedValueLocation: gl.getUniformLocation(computeProgram, 'u_fixedValue'),
-      axisIndexLocation: gl.getUniformLocation(computeProgram, 'u_axisIndex'),
+      colorCoordLocation: gl.getAttribLocation(computeProgram, 'a_colorCoord'),
+      modelViewProjectionLocation: gl.getUniformLocation(computeProgram, 'u_modelViewProjection'),
+      variableAxesLocation: gl.getUniformLocation(computeProgram, 'u_variableAxes'),
+      polarAngleAxisLocation: gl.getUniformLocation(computeProgram, 'u_polarAngleAxis'),
       colorSpaceIndexLocation: gl.getUniformLocation(computeProgram, 'u_colorSpaceIndex'),
       paletteColorsLocation: gl.getUniformLocation(computeProgram, 'u_paletteColors'),
       paletteCountLocation: gl.getUniformLocation(computeProgram, 'u_paletteCount'),
-      polarCoordinateAxisLocation: gl.getUniformLocation(computeProgram, 'u_polarCoordinateAxis'),
       distanceMetricLocation: gl.getUniformLocation(computeProgram, 'u_distanceMetric'),
       distanceThresholdLocation: gl.getUniformLocation(computeProgram, 'u_distanceThreshold'),
     };
@@ -80,6 +107,7 @@ export class CanvasRenderer {
     this._render = {
       program: renderProgram,
       positionLocation: gl.getAttribLocation(renderProgram, 'a_position'),
+      texCoordLocation: gl.getAttribLocation(renderProgram, 'a_texCoord'),
       colorTextureLocation: gl.getUniformLocation(renderProgram, 'u_colorTexture'),
       showBoundariesLocation: gl.getUniformLocation(renderProgram, 'u_showBoundaries'),
       highlightPaletteIndexLocation: gl.getUniformLocation(renderProgram, 'u_highlightPaletteIndex'),
@@ -91,7 +119,7 @@ export class CanvasRenderer {
   }
 
   /**
-   * Create framebuffer, texture, and vertex buffer
+   * Create framebuffer, texture, vertex buffer, and face geometry
    */
   _createResources() {
     const gl = this._gl;
@@ -105,10 +133,16 @@ export class CanvasRenderer {
     gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_WRAP_S, gl.CLAMP_TO_EDGE);
     gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_WRAP_T, gl.CLAMP_TO_EDGE);
 
+    // Create depth buffer for proper 3D rendering
+    this._depthBuffer = gl.createRenderbuffer();
+    gl.bindRenderbuffer(gl.RENDERBUFFER, this._depthBuffer);
+    gl.renderbufferStorage(gl.RENDERBUFFER, gl.DEPTH_COMPONENT24, this._width, this._height);
+
     // Create framebuffer
     this._framebuffer = gl.createFramebuffer();
     gl.bindFramebuffer(gl.FRAMEBUFFER, this._framebuffer);
     gl.framebufferTexture2D(gl.FRAMEBUFFER, gl.COLOR_ATTACHMENT0, gl.TEXTURE_2D, this._colorTexture, 0);
+    gl.framebufferRenderbuffer(gl.FRAMEBUFFER, gl.DEPTH_ATTACHMENT, gl.RENDERBUFFER, this._depthBuffer);
 
     // Check framebuffer completeness
     if (gl.checkFramebufferStatus(gl.FRAMEBUFFER) !== gl.FRAMEBUFFER_COMPLETE) {
@@ -118,7 +152,7 @@ export class CanvasRenderer {
     // Unbind framebuffer
     gl.bindFramebuffer(gl.FRAMEBUFFER, null);
 
-    // Create vertex buffer for full screen quad
+    // Create vertex buffer for full screen quad (for display pass)
     const quadData = new Float32Array([
       -1.0, -1.0, 0.0, 0.0,  // bottom-left
       1.0, -1.0, 1.0, 0.0,  // bottom-right
@@ -129,6 +163,82 @@ export class CanvasRenderer {
     this._quadBuffer = gl.createBuffer();
     gl.bindBuffer(gl.ARRAY_BUFFER, this._quadBuffer);
     gl.bufferData(gl.ARRAY_BUFFER, quadData, gl.STATIC_DRAW);
+  }
+
+  /**
+   * Create face geometry for 3D color space face rendering
+   * @param {ColorSpaceView} colorSpaceView - The color space view to determine which face to generate
+   */
+  _createFaceGeometry(colorSpaceView) {
+    const gl = this._gl;
+
+    // Generate a single face from the color space cube
+    // If no specific color space view is provided, generate a default face
+    const { vertices, indices } = this._generateFaceGeometry(colorSpaceView);
+
+    // Create face vertex buffer
+    this._faceVertexBuffer = gl.createBuffer();
+    gl.bindBuffer(gl.ARRAY_BUFFER, this._faceVertexBuffer);
+    gl.bufferData(gl.ARRAY_BUFFER, vertices, gl.STATIC_DRAW);
+
+    // Create face index buffer
+    this._faceIndexBuffer = gl.createBuffer();
+    gl.bindBuffer(gl.ELEMENT_ARRAY_BUFFER, this._faceIndexBuffer);
+    gl.bufferData(gl.ELEMENT_ARRAY_BUFFER, indices, gl.STATIC_DRAW);
+
+    this._faceIndexCount = indices.length;
+  }
+
+  /**
+   * Generate face geometry data for a specific color space view
+   * @param {ColorSpaceView} colorSpaceView - The color space view
+   * @returns {Object} Object with vertices and indices arrays
+   */
+  _generateFaceGeometry(colorSpaceView) {
+    // Calculate size to fill the viewport at camera distance z=2.0
+    // For perspective projection: tan(fov/2) * distance * 2
+    const fov = Math.PI / 3; // 60 degrees
+    const distance = 2.0;
+    const size = Math.tan(fov / 2) * distance * 2;
+    const half = size / 2;
+
+    // Generate face based on the color space view using cube renderer techniques
+    const colorSpace = colorSpaceView.colorSpace;
+    const currentAxisIndex = colorSpace.getAxisIndex(colorSpaceView.currentAxis);
+    const fixedValue = colorSpaceView.currentValue / colorSpaceView.currentAxis.max; // Normalized to [0,1]
+
+    // Generate 4 corners of the face using bit patterns (like cube renderer)
+    // Each face has 4 corners, represented by 2-bit patterns: 00, 01, 10, 11
+    const faceCorners = [];
+    for (let i = 0; i < 4; i++) {
+      const [u, v] = [i & 1, (i & 2) >> 1]; // Extract u,v from bit pattern
+      const colorCoord = [0, 0, 0];
+
+      // Set fixed axis value
+      colorCoord[currentAxisIndex] = fixedValue;
+
+      // Set variable axes values (similar to cube renderer face filtering)
+      let varIndex = 0;
+      for (let axis = 0; axis < 3; axis++) {
+        if (axis !== currentAxisIndex) {
+          colorCoord[axis] = varIndex === 0 ? u : v;
+          varIndex++;
+        }
+      }
+
+      // Position coordinates
+      const x = u * size - half;
+      const y = v * size - half;
+      const z = 0.0;
+
+      faceCorners.push([x, y, z, ...colorCoord]);
+    }
+
+    // Create vertices array from corners
+    const vertices = new Float32Array(faceCorners.flat());
+    const indices = new Uint16Array([0, 1, 2, 1, 2, 3]); // Two triangles
+
+    return { vertices, indices };
   }
 
   /**
@@ -185,7 +295,7 @@ export class CanvasRenderer {
   }
 
   /**
-   * Render a color space view with palette colors
+   * Render a 3D face representing the color space
    * @param {ColorSpaceView} colorSpaceView - Immutable color space view
    * @param {Array<NamedColor>} paletteColors - Array of palette colors to find closest matches for
    * @param {number|null} highlightPaletteIndex - Index of palette color to highlight (null for no highlight)
@@ -194,56 +304,86 @@ export class CanvasRenderer {
     // Store palette colors for consistency with indices
     this._paletteColors = [...paletteColors];
 
-    let polarAxis = null;
-    if (colorSpaceView.usePolarCoordinates) {
-      polarAxis = colorSpaceView.colorSpace.availablePolarAxis(
-        colorSpaceView.currentAxis);
-    }
+    // Regenerate face geometry for this color space view
+    this._createFaceGeometry(colorSpaceView);
 
-    // Compute phase: Render color space computation with closest palette index to framebuffer
-    this._computePhase(colorSpaceView, paletteColors, polarAxis);
+    // First phase: Render 3D face to framebuffer for color computation
+    this._computePhase(colorSpaceView, paletteColors);
 
-    // Render phase: Render framebuffer texture to canvas
+    // Second phase: Display framebuffer texture to canvas
     this._renderPhase(colorSpaceView.showBoundaries, highlightPaletteIndex);
 
-    // Update axis labels for the current color space view
+    // Update axis labels for the current color space view (maintain 2D functionality)
+    const polarAxis = colorSpaceView.usePolarCoordinates ?
+      colorSpaceView.colorSpace.availablePolarAxis(colorSpaceView.currentAxis) : null;
     this._updateAxisLabels(colorSpaceView, polarAxis);
   }
 
   /**
-   * Compute phase: Render color space computation to framebuffer
+   * Compute phase: Render 3D face to framebuffer for color computation
    * @param {ColorSpaceView} colorSpaceView - Immutable color space view
    * @param {Array<NamedColor>} paletteColors - Array of palette colors to find closest matches for
-   * @param {Axis|null} polarAxis - Axis to use for polar coordinates, or null if not polar display
    */
-  _computePhase(colorSpaceView, paletteColors, polarAxis) {
+  _computePhase(colorSpaceView, paletteColors) {
     const gl = this._gl;
 
-    // Bind framebuffer
+    // Bind framebuffer for rendering
     gl.bindFramebuffer(gl.FRAMEBUFFER, this._framebuffer);
     gl.viewport(0, 0, this._width, this._height);
 
-    // Use compute program
-    gl.useProgram(this._compute.program);
-    this._setupVertexAttributes(this._compute.positionLocation, this._compute.texCoordLocation);
+    // Clear and setup
+    gl.clearColor(0.0, 0.0, 0.0, 1.0); // Set alpha to 1.0 for valid pixels
+    gl.clear(gl.COLOR_BUFFER_BIT | gl.DEPTH_BUFFER_BIT);
 
-    // Set uniforms
-    gl.uniform1i(this._compute.axisIndexLocation, colorSpaceView.colorSpace.getAxisIndex(colorSpaceView.currentAxis));
-    gl.uniform1f(this._compute.fixedValueLocation, colorSpaceView.currentValue / colorSpaceView.currentAxis.max);
+    // Use the compute program to render 3D face with color space computation
+    gl.useProgram(this._compute.program);
+
+    // Set up vertex attributes for 3D face
+    gl.bindBuffer(gl.ARRAY_BUFFER, this._faceVertexBuffer);
+    gl.bindBuffer(gl.ELEMENT_ARRAY_BUFFER, this._faceIndexBuffer);
+    gl.enableVertexAttribArray(this._compute.positionLocation);
+    gl.vertexAttribPointer(this._compute.positionLocation, 3, gl.FLOAT, false, 24, 0);
+    gl.enableVertexAttribArray(this._compute.colorCoordLocation);
+    gl.vertexAttribPointer(this._compute.colorCoordLocation, 3, gl.FLOAT, false, 24, 12);
+
+    // Create transformation matrix
+    const mvpMatrix = mat4.create();
+    mat4.perspective(mvpMatrix, Math.PI / 3, this._width / this._height, 0.1, 100.0);
+    mat4.translate(mvpMatrix, mvpMatrix, [0, 0, -2.0]);
+    mat4.multiply(mvpMatrix, mvpMatrix, this._rotationMatrix);
+
+    // Set transformation matrix uniform
+    gl.uniformMatrix4fv(this._compute.modelViewProjectionLocation, false, mvpMatrix);
+
+    // Set the variable axes and polar configuration for the current slice
+    const colorSpace = colorSpaceView.colorSpace;
+    const currentAxisIndex = colorSpace.getAxisIndex(colorSpaceView.currentAxis);
+
+    // Calculate the two variable axes (the ones that aren't fixed)
+    const variableAxes = [];
+    for (let i = 0; i < 3; i++) {
+      if (i !== currentAxisIndex) {
+        variableAxes.push(i);
+      }
+    }
+    gl.uniform2iv(this._compute.variableAxesLocation, variableAxes);
+
+    // Set polar angle axis if enabled
+    const polarAxis = colorSpaceView.usePolarCoordinates ?
+      colorSpaceView.colorSpace.availablePolarAxis(colorSpaceView.currentAxis) : null;
+    const polarAxisIndex = polarAxis ? colorSpace.getAxisIndex(polarAxis) : -1;
+    gl.uniform1i(this._compute.polarAngleAxisLocation, polarAxisIndex);
+
+    // Set color space uniform
     gl.uniform1i(this._compute.colorSpaceIndexLocation, getAllColorSpaces().indexOf(colorSpaceView.colorSpace));
 
-    // Set distance metric uniform (index based on getAllDistanceMetrics order)
+    // Set distance metric uniform
     gl.uniform1i(
       this._compute.distanceMetricLocation,
       getAllDistanceMetrics().indexOf(colorSpaceView.distanceMetric));
 
     // Set distance threshold uniform
     gl.uniform1f(this._compute.distanceThresholdLocation, colorSpaceView.distanceThreshold);
-
-    // Set polar coordinates uniform
-    const polarCoordinateAxis = polarAxis !== null ?
-      colorSpaceView.colorSpace.getAxisIndex(polarAxis) : -1;
-    gl.uniform1i(this._compute.polarCoordinateAxisLocation, polarCoordinateAxis);
 
     // Set palette colors uniforms
     const actualCount = Math.min(paletteColors.length, MAX_PALETTE_COLORS);
@@ -260,12 +400,12 @@ export class CanvasRenderer {
     }
     gl.uniform3fv(this._compute.paletteColorsLocation, paletteData);
 
-    // Draw
-    gl.drawArrays(gl.TRIANGLE_STRIP, 0, 4);
+    // Draw the 3D face to framebuffer
+    gl.drawElements(gl.TRIANGLES, this._faceIndexCount, gl.UNSIGNED_SHORT, 0);
   }
 
   /**
-   * Render phase: Render framebuffer texture to canvas
+   * Render phase: Render framebuffer texture to canvas for display
    * @param {boolean} showBoundaries - Whether to show region boundaries
    * @param {number|null} highlightPaletteIndex - Index of palette color to highlight (null for no highlight)
    */
@@ -276,9 +416,16 @@ export class CanvasRenderer {
     gl.bindFramebuffer(gl.FRAMEBUFFER, null);
     gl.viewport(0, 0, this._width, this._height);
 
+    // Clear the canvas
+    gl.clearColor(0.0, 0.0, 0.0, 1.0);
+    gl.clear(gl.COLOR_BUFFER_BIT);
+
+    // Disable depth testing for 2D display pass
+    gl.disable(gl.DEPTH_TEST);
+
     // Use render program
     gl.useProgram(this._render.program);
-    this._setupVertexAttributes(this._render.positionLocation);
+    this._setupVertexAttributes(this._render.positionLocation, this._render.texCoordLocation);
 
     // Bind and set the compute texture
     gl.activeTexture(gl.TEXTURE0);
@@ -291,8 +438,11 @@ export class CanvasRenderer {
     // Set highlight palette index uniform (convert null to -1 for shader)
     gl.uniform1i(this._render.highlightPaletteIndexLocation, highlightPaletteIndex ?? -1);
 
-    // Draw
+    // Draw full-screen quad
     gl.drawArrays(gl.TRIANGLE_STRIP, 0, 4);
+
+    // Re-enable depth testing for subsequent 3D rendering
+    gl.enable(gl.DEPTH_TEST);
   }
 
   /**
