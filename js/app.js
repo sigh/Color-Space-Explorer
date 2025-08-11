@@ -15,6 +15,9 @@ class ColorSpaceExplorer {
     this._deferredUpdateRenderer = deferUntilAnimationFrame(
       this._updateRenderer.bind(this));
 
+    // Initialize 3D mode state from URL
+    this._use3D = new URLSearchParams(window.location.search).has('3d');
+
     const colorDisplayContainer = document.querySelector('.color-display-section');
     this._colorDisplay = new ColorDisplay(colorDisplayContainer);
 
@@ -38,11 +41,7 @@ class ColorSpaceExplorer {
   }
 
   async init() {
-    // Check URL parameter to determine renderer type
-    const params = new URLSearchParams(window.location.search);
-    const use3D = params.has('3d');
-
-    const rendererClass = use3D ? CubeRenderer : CanvasRenderer;
+    const rendererClass = this._use3D ? CubeRenderer : CanvasRenderer;
     this._renderer = await rendererClass.create(
       document.querySelector('.canvas-container'));
 
@@ -52,8 +51,9 @@ class ColorSpaceExplorer {
       this._renderer,
       this._colorDisplay,
       this._colorPalette,
-      URLStateManager
-    );
+      URLStateManager,
+      this._deferredUpdateRenderer,
+      this._use3D);
 
     this._updateRenderer(); // No deferral
   }
@@ -62,15 +62,48 @@ class ColorSpaceExplorer {
     if (!this._renderer) return;
     const colorSpaceView = this._uiController.getCurrentColorSpaceView();
     const paletteColors = this._colorPalette.getColors();
-    this._renderer.renderColorSpace(
-      colorSpaceView,
-      paletteColors,
-      options?.highlightIndex);
+
+    // Pass rotation matrix for 3D renderer
+    if (this._use3D) {
+      this._renderer.renderColorSpace(
+        colorSpaceView,
+        paletteColors,
+        options?.highlightIndex,
+        this._canvasUI.getRotationMatrix()
+      );
+    } else {
+      this._renderer.renderColorSpace(
+        colorSpaceView,
+        paletteColors,
+        options?.highlightIndex
+      );
+    }
 
     // Serialize state to URL whenever we render
     URLStateManager.serializeColorSpaceViewToURL(colorSpaceView);
 
     this._canvasUI.recalculateSelection();
+  }
+
+  /**
+   * Toggle between 3D and 2D rendering modes
+   * @param {boolean} use3D - Whether to use 3D mode
+   */
+  async toggle3DMode(use3D) {
+    if (this._use3D === use3D) return; // No change needed
+
+    this._use3D = use3D;
+
+    // Create new renderer
+    const rendererClass = this._use3D ? CubeRenderer : CanvasRenderer;
+    this._renderer = await rendererClass.create(
+      document.querySelector('.canvas-container'));
+
+    // Update canvas UI for new mode
+    this._canvasUI.setRenderer(this._renderer, this._use3D);
+
+    // Re-render with new renderer
+    this._updateRenderer();
   }
 }
 

@@ -1,16 +1,25 @@
 import { CubeRenderer } from './cubeRenderer.js';
 
+// Import gl-matrix for 3D rotation matrix operations
+import '../lib/gl-matrix-min.js';
+const { mat4 } = glMatrix;
+
 /**
  * Handles mouse interactions and UI elements for the canvas
  */
 export class CanvasUI {
-  constructor(canvasPanel, renderer, colorDisplay, colorPalette, urlStateManager) {
+  constructor(canvasPanel, renderer, colorDisplay, colorPalette, urlStateManager, onRotationChange, use3D) {
     this._canvasContainer = canvasPanel.querySelector('.canvas-container');
     this._renderer = renderer;
     this._colorDisplay = colorDisplay;
     this._colorPalette = colorPalette;
     this._urlStateManager = urlStateManager;
+    this._onRotationChange = onRotationChange;
+    this._use3D = use3D;
     this._selectionIndicator = null;
+
+    // 3D rotation matrix for cube renderer
+    this._rotationMatrix = mat4.create();
 
     this._setupMouseHandlers(canvasPanel);
     this._initializeSelectionFromURL();
@@ -20,22 +29,69 @@ export class CanvasUI {
    * Set up mouse event handlers for the canvas
    */
   _setupMouseHandlers(canvasPanel) {
-    // Check if we're using 3D renderer
-    const is3DRenderer = this._renderer instanceof CubeRenderer;
+    let isDragging = false;
+    let lastMouseX = 0;
+    let lastMouseY = 0;
 
-    // Mouse move handler for hover effect (skip for 3D renderer)
-    this._canvasContainer.addEventListener('mousemove', (event) => {
+    const setCursor = (isOverColor) => {
+      if (isDragging && this._use3D) return;
+      canvasPanel.style.cursor = isOverColor ? 'crosshair' : 'default';
+    }
+
+    const mouseDownHandler = (event) => {
+      isDragging = true;
+      lastMouseX = event.clientX;
+      lastMouseY = event.clientY;
+
+      if (this._use3D) {
+        event.stopPropagation();
+      }
+    };
+
+    const mouseDragHandler = (event) => {
+      const deltaX = event.clientX - lastMouseX;
+      const deltaY = event.clientY - lastMouseY;
+
+      // Create incremental rotation matrices and apply them to current rotation
+      const rotationSpeed = 0.01;
+      const deltaRotation = mat4.create();
+
+      // Apply world Y rotation
+      mat4.fromYRotation(deltaRotation, deltaX * rotationSpeed);
+      mat4.multiply(this._rotationMatrix, deltaRotation, this._rotationMatrix);
+
+      // Apply world X rotation
+      mat4.fromXRotation(deltaRotation, deltaY * rotationSpeed);
+      mat4.multiply(this._rotationMatrix, deltaRotation, this._rotationMatrix);
+
+      // Trigger re-render with rotation via callback
+      if (this._onRotationChange) {
+        this._onRotationChange();
+      }
+    }
+
+    const mouseMoveHandler = (event) => {
+      // Handle 3D rotation if dragging
+      if (isDragging) {
+        if (this._use3D) {
+          canvasPanel.style.cursor = 'grab';
+          mouseDragHandler(event);
+        }
+
+        lastMouseX = event.clientX;
+        lastMouseY = event.clientY;
+      }
+
       const [x, y] = this._getCanvasCoordsFromMouseEvent(event);
       const [rgbColor, closestColor] = this._renderer.getColorAt(x, y);
-
-      this._canvasContainer.style.cursor = rgbColor ? 'crosshair' : 'default';
+      setCursor(rgbColor !== null);
 
       // Skip hover updates if there's a selection
       if (this._selectionIndicator) {
         if (event.target === this._selectionIndicator) {
           // Change back to default to indicate that clicking will clear
           // the selection.
-          this._canvasContainer.style.cursor = 'default';
+          setCursor(false);
         }
         return;
       }
@@ -46,19 +102,29 @@ export class CanvasUI {
       }
 
       this._colorDisplay.setColors(rgbColor, closestColor);
-    });
+    };
 
-    // Mouse leave handler to reset to default (skip for 3D renderer)
-    this._canvasContainer.addEventListener('mouseleave', () => {
+    const mouseUpHandler = (event) => {
+      isDragging = false;
+      if (this._use3D) {
+        const [x, y] = this._getCanvasCoordsFromMouseEvent(event);
+        const [rgbColor] = this._renderer.getColorAt(x, y);
+        setCursor(rgbColor !== null);
+      }
+      event.stopPropagation();
+    };
+
+    const mouseLeaveHandler = (event) => {
+      isDragging = false;
+      canvasPanel.style.removeProperty('cursor');
       // Skip clearing if there's a selection
       if (this._selectionIndicator) return;
-
       this._colorDisplay.clearColors();
-    });
+    };
 
-    // Click handler for canvas panel (skip for 3D renderer)
-    canvasPanel.addEventListener('click', (event) => {
-      if (is3DRenderer) return; // Let 3D renderer handle its own mouse events
+    // Click handler - only active in 2D mode
+    const clickHandler = (event) => {
+      if (this._use3D) return; // No click handling in 3D mode
 
       const selectionClicked = event.target === this._selectionIndicator;
       const [x, y] = this._getCanvasCoordsFromMouseEvent(event);
@@ -83,10 +149,37 @@ export class CanvasUI {
 
       if (!selectionClicked) {
         this._setSelection([x, y], rgbColor, closestColor);
+        setCursor(false);
       } else {
         this._colorDisplay.setColors(rgbColor, closestColor);
+        setCursor(true);
       }
-    });
+    };
+
+    canvasPanel.addEventListener('mousedown', mouseDownHandler);
+    canvasPanel.addEventListener('mousemove', mouseMoveHandler);
+    canvasPanel.addEventListener('mouseup', mouseUpHandler);
+    canvasPanel.addEventListener('mouseleave', mouseLeaveHandler);
+    canvasPanel.addEventListener('click', clickHandler);
+  }
+
+  /**
+   * Update renderer and mode (for toggling between 2D/3D)
+   * @param {CanvasRenderer|CubeRenderer} renderer - New renderer instance
+   * @param {boolean} use3D - Whether using 3D mode
+   */
+  setRenderer(renderer, use3D) {
+    this._renderer = renderer;
+    this._use3D = use3D;
+    this._clearSelection();
+  }
+
+  /**
+   * Get the current rotation matrix for 3D rendering
+   * @returns {Float32Array} The 4x4 rotation matrix
+   */
+  getRotationMatrix() {
+    return this._rotationMatrix;
   }
 
   /**

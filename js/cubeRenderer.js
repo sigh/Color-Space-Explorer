@@ -24,16 +24,11 @@ export class CubeRenderer {
     this._framebuffer = null;
     this._framebufferTexture = null;
     this._depthBuffer = null;
-    this._rotationMatrix = mat4.create();
     this._viewMatrix = mat4.create();
     this._projectionMatrix = mat4.create();
-    this._currentColorSpaceView = null;
-    this._currentPaletteColors = null;
-    this._currentHighlightPaletteIndex = null;
 
     this._setupWebGL();
     this._setupCamera();
-    this._setupMouseControls();
   }
 
   /**
@@ -275,63 +270,6 @@ export class CubeRenderer {
   }
 
   /**
-   * Setup mouse controls for camera rotation
-   */
-  _setupMouseControls() {
-    const element = this.canvas;
-    let isDragging = false;
-    let lastMouseX = 0;
-    let lastMouseY = 0;
-
-    const onMouseDown = (e) => {
-      isDragging = true;
-      lastMouseX = e.clientX;
-      lastMouseY = e.clientY;
-      e.stopPropagation();
-    };
-
-    const onMouseMove = (e) => {
-      if (!isDragging) return;
-
-      const deltaX = e.clientX - lastMouseX;
-      const deltaY = e.clientY - lastMouseY;
-
-      // // Create incremental rotation matrices and apply them to current rotation
-      const rotationSpeed = 0.01;
-      const deltaRotation = mat4.create();
-
-      // Apply world Y rotation
-      mat4.fromYRotation(deltaRotation, deltaX * rotationSpeed);
-      mat4.multiply(this._rotationMatrix, deltaRotation, this._rotationMatrix);
-
-      // Apply world X rotation
-      mat4.fromXRotation(deltaRotation, deltaY * rotationSpeed);
-      mat4.multiply(this._rotationMatrix, deltaRotation, this._rotationMatrix);
-
-      lastMouseX = e.clientX;
-      lastMouseY = e.clientY;
-
-      // Re-render both framebuffer and canvas when rotating
-      if (this._currentColorSpaceView && this._currentPaletteColors) {
-        this._renderToFramebuffer(this._currentColorSpaceView, this._currentPaletteColors);
-        this._renderToCanvas(this._currentColorSpaceView.showBoundaries, this._currentHighlightPaletteIndex);
-      }
-
-      e.stopPropagation();
-    };
-
-    const onMouseUp = (e) => {
-      isDragging = false;
-      e.stopPropagation();
-    };
-
-    element.addEventListener('mousedown', onMouseDown);
-    element.addEventListener('mousemove', onMouseMove);
-    element.addEventListener('mouseup', onMouseUp);
-    element.addEventListener('mouseleave', onMouseUp);
-  }
-
-  /**
    * Create and compile a shader
    */
   _createShader(type, source) {
@@ -371,17 +309,14 @@ export class CubeRenderer {
    * @param {ColorSpaceView} colorSpaceView - Immutable color space view
    * @param {Array<NamedColor>} paletteColors - Array of palette colors to find closest matches for
    * @param {number|null} highlightPaletteIndex - Index of palette color to highlight (null for no highlight)
+   * @param {Float32Array} rotationMatrix - 4x4 rotation matrix for the cube
    */
-  renderColorSpace(colorSpaceView, paletteColors = [], highlightPaletteIndex = null) {
+  renderColorSpace(colorSpaceView, paletteColors = [], highlightPaletteIndex = null, rotationMatrix = null) {
     // Store palette colors for consistency with indices
     this._paletteColors = [...paletteColors];
 
-    this._currentColorSpaceView = colorSpaceView;
-    this._currentPaletteColors = paletteColors;
-    this._currentHighlightPaletteIndex = highlightPaletteIndex;
-
     // First render: 3D cube to framebuffer for color lookup
-    this._renderToFramebuffer(colorSpaceView, paletteColors);
+    this._renderToFramebuffer(colorSpaceView, paletteColors, rotationMatrix);
 
     // Second render: display framebuffer texture to canvas
     this._renderToCanvas(colorSpaceView.showBoundaries, highlightPaletteIndex);
@@ -391,8 +326,9 @@ export class CubeRenderer {
    * Render 3D cube to framebuffer for color lookup
    * @param {ColorSpaceView} colorSpaceView - Immutable color space view
    * @param {Array<NamedColor>} paletteColors - Array of palette colors to find closest matches for
+   * @param {Float32Array} rotationMatrix - 4x4 rotation matrix for the cube
    */
-  _renderToFramebuffer(colorSpaceView, paletteColors) {
+  _renderToFramebuffer(colorSpaceView, paletteColors, rotationMatrix = null) {
     const gl = this._gl;
 
     // Bind framebuffer for rendering
@@ -418,7 +354,11 @@ export class CubeRenderer {
     const mvpMatrix = mat4.create();
     mat4.perspective(mvpMatrix, Math.PI / 3, this._width / this._height, 0.1, 100.0);
     mat4.translate(mvpMatrix, mvpMatrix, [0, 0, -2.5]);
-    mat4.multiply(mvpMatrix, mvpMatrix, this._rotationMatrix);
+
+    // Apply rotation matrix if provided, otherwise use identity
+    if (rotationMatrix) {
+      mat4.multiply(mvpMatrix, mvpMatrix, rotationMatrix);
+    }
 
     // Set transformation matrix uniform
     gl.uniformMatrix4fv(this._compute.modelViewProjectionLocation, false, mvpMatrix);
