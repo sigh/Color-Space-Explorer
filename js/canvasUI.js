@@ -1,5 +1,3 @@
-import { CubeRenderer } from './cubeRenderer.js';
-
 // Import gl-matrix for 3D rotation matrix operations
 import '../lib/gl-matrix-min.js';
 const { mat4 } = glMatrix;
@@ -8,14 +6,14 @@ const { mat4 } = glMatrix;
  * Handles mouse interactions and UI elements for the canvas
  */
 export class CanvasUI {
-  constructor(canvasPanel, renderer, colorDisplay, colorPalette, urlStateManager, onRotationChange, use3D) {
+  constructor(canvasPanel, renderer, colorDisplay, colorPalette, urlStateManager, onRotationChange) {
     this._canvasContainer = canvasPanel.querySelector('.canvas-container');
     this._renderer = renderer;
     this._colorDisplay = colorDisplay;
     this._colorPalette = colorPalette;
     this._urlStateManager = urlStateManager;
     this._onRotationChange = onRotationChange;
-    this._use3D = use3D;
+    this._use3D = false;
     this._selectionIndicator = null;
 
     // 3D rotation matrix for cube renderer
@@ -164,12 +162,10 @@ export class CanvasUI {
   }
 
   /**
-   * Update renderer and mode (for toggling between 2D/3D)
-   * @param {CanvasRenderer|CubeRenderer} renderer - New renderer instance
+   * Update mode (for toggling between 2D/3D)
    * @param {boolean} use3D - Whether using 3D mode
    */
-  setRenderer(renderer, use3D) {
-    this._renderer = renderer;
+  setUse3D(use3D) {
     this._use3D = use3D;
     this._clearSelection();
   }

@@ -8,9 +8,24 @@ const { mat4 } = glMatrix;
 
 const OUTSIDE_COLOR_SPACE = 255;
 
+// Camera and projection constants
+const CAMERA_FOV = Math.PI / 3; // 60 degrees
+const CAMERA_DISTANCE = 2;
+
 /**
- * WebGL2 Canvas renderer for color spaces with framebuffer rendering
+ * Calculate the size needed to fill the viewport at a given camera distance
+ * @param {number} distance - Camera distance
+ * @param {number} fov - Field of view in radians (optional, defaults to CAMERA_FOV)
+ * @returns {number} Size that fills the viewport
  */
+function calculateViewportSize(distance, fov = CAMERA_FOV) {
+  // For perspective projection: tan(fov/2) * distance * 2
+  return Math.tan(fov / 2) * distance * 2;
+}
+
+/**
+* WebGL2 Canvas renderer for color spaces with framebuffer rendering
+*/
 export class CanvasRenderer {
   constructor(canvasContainer, computeVertexShaderSource, computeFragmentShaderSource, vertexShaderSource, renderFragmentShaderSource) {
     const canvas = canvasContainer.querySelector('canvas');
@@ -24,10 +39,15 @@ export class CanvasRenderer {
     this._height = canvas.height;
     this._paletteColors = []; // The palette colors used for indexing.
 
-    // Add 3D transformation support
-    this._rotationMatrix = mat4.create();
-    this._viewMatrix = mat4.create();
-    this._projectionMatrix = mat4.create();
+    // Initialize unified geometry object
+    this._geometry = {
+      vertexBuffer: null,
+      indexBuffer: null,
+      indexCount: 0
+    };
+
+    // Initialize transformation matrix
+    this._mvpMatrix = this._createTransformationMatrix();
 
     // Create axis container for labels and tick marks
     this._axisContainer = document.createElement('div');
@@ -35,18 +55,18 @@ export class CanvasRenderer {
     canvasContainer.appendChild(this._axisContainer);
 
     this._initWebGL(computeVertexShaderSource, computeFragmentShaderSource, vertexShaderSource, renderFragmentShaderSource);
-    this._setupCamera();
   }
 
   /**
-   * Setup camera matrices for 3D face rendering
+   * Create the base transformation matrix with projection and camera translation
+   * @returns {mat4} The transformation matrix
    */
-  _setupCamera() {
-    // Set up view matrix (camera looking at origin)
-    mat4.lookAt(this._viewMatrix, [0, 0, 2.0], [0, 0, 0], [0, 1, 0]);
-
-    // Set up projection matrix
-    mat4.perspective(this._projectionMatrix, Math.PI / 3, this._width / this._height, 0.1, 100.0);
+  _createTransformationMatrix() {
+    const mvpMatrix = mat4.create();
+    // Create base transformation matrix with projection and camera position
+    mat4.perspective(mvpMatrix, CAMERA_FOV, this._width / this._height, 0.1, 100.0);
+    mat4.translate(mvpMatrix, mvpMatrix, [0, 0, -CAMERA_DISTANCE]);
+    return mvpMatrix;
   }
 
   /**
@@ -166,27 +186,62 @@ export class CanvasRenderer {
   }
 
   /**
-   * Create face geometry for 3D color space face rendering
-   * @param {ColorSpaceView} colorSpaceView - The color space view to determine which face to generate
+   * Create geometry buffers from vertices and indices data
+   * @param {Float32Array} vertices - Vertex data
+   * @param {Uint16Array} indices - Index data
    */
-  _createFaceGeometry(colorSpaceView) {
+  _createGeometry(vertices, indices) {
     const gl = this._gl;
 
-    // Generate a single face from the color space cube
-    // If no specific color space view is provided, generate a default face
-    const { vertices, indices } = this._generateFaceGeometry(colorSpaceView);
-
-    // Create face vertex buffer
-    this._faceVertexBuffer = gl.createBuffer();
-    gl.bindBuffer(gl.ARRAY_BUFFER, this._faceVertexBuffer);
+    // Create vertex buffer
+    this._geometry.vertexBuffer = gl.createBuffer();
+    gl.bindBuffer(gl.ARRAY_BUFFER, this._geometry.vertexBuffer);
     gl.bufferData(gl.ARRAY_BUFFER, vertices, gl.STATIC_DRAW);
 
-    // Create face index buffer
-    this._faceIndexBuffer = gl.createBuffer();
-    gl.bindBuffer(gl.ELEMENT_ARRAY_BUFFER, this._faceIndexBuffer);
+    // Create index buffer
+    this._geometry.indexBuffer = gl.createBuffer();
+    gl.bindBuffer(gl.ELEMENT_ARRAY_BUFFER, this._geometry.indexBuffer);
     gl.bufferData(gl.ELEMENT_ARRAY_BUFFER, indices, gl.STATIC_DRAW);
 
-    this._faceIndexCount = indices.length;
+    this._geometry.indexCount = indices.length;
+  }
+
+  /**
+   * Generate 3D cube geometry data programmatically (same logic as CubeRenderer)
+   * @returns {Object} Object with vertices and indices arrays
+   */
+  _generate3DCubeGeometry() {
+    const size = 1.1; // Cube size for better visibility
+
+    // Generate all 8 corners of the cube with RGB color coordinates
+    // Color axis order [0,1,2] means x->R, y->G, z->B
+    const corners = CubeGeometryHelper.generateCubeCorners(size, [0, 1, 2]);
+
+    // Generate faces programmatically - each face shares one coordinate
+    const vertices = [];
+    const indices = [];
+
+    // Generate 6 faces (3 axes × 2 directions each)
+    for (let axis = 0; axis < 3; axis++) {
+      for (let direction = 0; direction < 2; direction++) {
+        const baseIndex = vertices.length / 6;  // Each vertex has 6 components
+
+        // Find the 4 corners that belong to this face
+        const faceCorners = CubeGeometryHelper.filterCornersByFace(
+          corners, axis, direction);
+
+        // Add vertices for this face
+        vertices.push(...faceCorners.flat());
+
+        // Add triangles for this face (quad split into 2 triangles)
+        indices.push(...CubeGeometryHelper.generateFaceIndexes(baseIndex));
+      }
+    }
+
+    return {
+      vertices: new Float32Array(vertices),
+      indices: new Uint16Array(indices)
+    };
   }
 
   /**
@@ -195,48 +250,41 @@ export class CanvasRenderer {
    * @returns {Object} Object with vertices and indices arrays
    */
   _generateFaceGeometry(colorSpaceView) {
-    // Calculate size to fill the viewport at camera distance z=2.0
-    // For perspective projection: tan(fov/2) * distance * 2
-    const fov = Math.PI / 3; // 60 degrees
-    const distance = 2.0;
-    const size = Math.tan(fov / 2) * distance * 2;
-    const half = size / 2;
+    // Calculate size to fill the viewport at the 2D camera distance
+    const size = calculateViewportSize(CAMERA_DISTANCE);
 
     // Generate face based on the color space view using cube renderer techniques
     const colorSpace = colorSpaceView.colorSpace;
     const currentAxisIndex = colorSpace.getAxisIndex(colorSpaceView.currentAxis);
     const fixedValue = colorSpaceView.currentValue / colorSpaceView.currentAxis.max; // Normalized to [0,1]
 
-    // Generate 4 corners of the face using bit patterns (like cube renderer)
-    // Each face has 4 corners, represented by 2-bit patterns: 00, 01, 10, 11
-    const faceCorners = [];
-    for (let i = 0; i < 4; i++) {
-      const [u, v] = [i & 1, (i & 2) >> 1]; // Extract u,v from bit pattern
-      const colorCoord = [0, 0, 0];
+    // Create color axis mapping where:
+    // - X position maps to first variable axis
+    // - Y position maps to second variable axis
+    // - Z position maps to fixed axis (will be set to fixedValue)
+    const colorAxisOrder = [0, 1, 2]
+      .filter(axis => axis !== currentAxisIndex);
+    colorAxisOrder.push(currentAxisIndex);
 
-      // Set fixed axis value
-      colorCoord[currentAxisIndex] = fixedValue;
+    // Generate cube corners with the mapped axis order
+    const allCorners = CubeGeometryHelper.generateCubeCorners(size, colorAxisOrder);
 
-      // Set variable axes values (similar to cube renderer face filtering)
-      let varIndex = 0;
-      for (let axis = 0; axis < 3; axis++) {
-        if (axis !== currentAxisIndex) {
-          colorCoord[axis] = varIndex === 0 ? u : v;
-          varIndex++;
-        }
-      }
+    // Filter to get the 4 corners with the same z value.
+    const faceCorners = CubeGeometryHelper.filterCornersByFace(allCorners, 2, 1);
 
-      // Position coordinates
-      const x = u * size - half;
-      const y = v * size - half;
-      const z = 0.0;
+    // Adjust the color coordinates for the fixed axis to the exact value
+    const adjustedCorners = faceCorners.map(corner => {
+      const adjustedCorner = [...corner];
+      // Set exact fixed value in original color space
+      adjustedCorner[3 + currentAxisIndex] = fixedValue;
+      // Position Z to 0 for 2D face
+      adjustedCorner[2] = 0.0;
+      return adjustedCorner;
+    });
 
-      faceCorners.push([x, y, z, ...colorCoord]);
-    }
-
-    // Create vertices array from corners
-    const vertices = new Float32Array(faceCorners.flat());
-    const indices = new Uint16Array([0, 1, 2, 1, 2, 3]); // Two triangles
+    // Create vertices array from corners and simple indices for single face
+    const vertices = new Float32Array(adjustedCorners.flat());
+    const indices = new Uint16Array(CubeGeometryHelper.generateFaceIndexes(0));
 
     return { vertices, indices };
   }
@@ -304,14 +352,15 @@ export class CanvasRenderer {
     // Store palette colors for consistency with indices
     this._paletteColors = [...paletteColors];
 
-    // Regenerate face geometry for this color space view
-    this._createFaceGeometry(colorSpaceView);
+    // Regenerate 2D face geometry
+    const { vertices, indices } = this._generateFaceGeometry(colorSpaceView);
+    this._createGeometry(vertices, indices);
 
     // First phase: Render 3D face to framebuffer for color computation
-    this._computePhase(colorSpaceView, paletteColors);
+    this._renderToFramebuffer(colorSpaceView, paletteColors);
 
     // Second phase: Display framebuffer texture to canvas
-    this._renderPhase(colorSpaceView.showBoundaries, highlightPaletteIndex);
+    this._renderToCanvas(colorSpaceView.showBoundaries, highlightPaletteIndex);
 
     // Update axis labels for the current color space view (maintain 2D functionality)
     const polarAxis = colorSpaceView.usePolarCoordinates ?
@@ -320,11 +369,34 @@ export class CanvasRenderer {
   }
 
   /**
-   * Compute phase: Render 3D face to framebuffer for color computation
+   * Render a 3D color space cube with rotation (same functionality as CubeRenderer)
    * @param {ColorSpaceView} colorSpaceView - Immutable color space view
    * @param {Array<NamedColor>} paletteColors - Array of palette colors to find closest matches for
+   * @param {number|null} highlightPaletteIndex - Index of palette color to highlight (null for no highlight)
+   * @param {Float32Array} rotationMatrix - 4x4 rotation matrix for the cube
    */
-  _computePhase(colorSpaceView, paletteColors) {
+  render3DColorSpace(colorSpaceView, paletteColors = [], highlightPaletteIndex = null, rotationMatrix = null) {
+    // Store palette colors for consistency with indices
+    this._paletteColors = [...paletteColors];
+
+    // Create 3D cube geometry
+    const { vertices, indices } = this._generate3DCubeGeometry();
+    this._createGeometry(vertices, indices);
+
+    // First phase: Render 3D cube to framebuffer for color computation
+    this._renderToFramebuffer(colorSpaceView, paletteColors, rotationMatrix);
+
+    // Second phase: Display framebuffer texture to canvas
+    this._renderToCanvas(colorSpaceView.showBoundaries, highlightPaletteIndex);
+  }
+
+  /**
+   * Compute colors into the framebuffer
+   * @param {ColorSpaceView} colorSpaceView - Immutable color space view
+   * @param {Array<NamedColor>} paletteColors - Array of palette colors to find closest matches for
+   * @param {Float32Array} rotationMatrix - 4x4 rotation matrix for the cube (only used for 3D)
+   */
+  _renderToFramebuffer(colorSpaceView, paletteColors, rotationMatrix = null) {
     const gl = this._gl;
 
     // Bind framebuffer for rendering
@@ -335,55 +407,60 @@ export class CanvasRenderer {
     gl.clearColor(0.0, 0.0, 0.0, 1.0); // Set alpha to 1.0 for valid pixels
     gl.clear(gl.COLOR_BUFFER_BIT | gl.DEPTH_BUFFER_BIT);
 
-    // Use the compute program to render 3D face with color space computation
+    // Use the compute program to render with color space computation
     gl.useProgram(this._compute.program);
 
-    // Set up vertex attributes for 3D face
-    gl.bindBuffer(gl.ARRAY_BUFFER, this._faceVertexBuffer);
-    gl.bindBuffer(gl.ELEMENT_ARRAY_BUFFER, this._faceIndexBuffer);
+    // Set up vertex attributes
+    gl.bindBuffer(gl.ARRAY_BUFFER, this._geometry.vertexBuffer);
+    gl.bindBuffer(gl.ELEMENT_ARRAY_BUFFER, this._geometry.indexBuffer);
+
     gl.enableVertexAttribArray(this._compute.positionLocation);
     gl.vertexAttribPointer(this._compute.positionLocation, 3, gl.FLOAT, false, 24, 0);
     gl.enableVertexAttribArray(this._compute.colorCoordLocation);
     gl.vertexAttribPointer(this._compute.colorCoordLocation, 3, gl.FLOAT, false, 24, 12);
 
-    // Create transformation matrix
-    const mvpMatrix = mat4.create();
-    mat4.perspective(mvpMatrix, Math.PI / 3, this._width / this._height, 0.1, 100.0);
-    mat4.translate(mvpMatrix, mvpMatrix, [0, 0, -2.0]);
-    mat4.multiply(mvpMatrix, mvpMatrix, this._rotationMatrix);
+    // Compute transformation matrix (apply rotation if provided)
+    const finalMvpMatrix = rotationMatrix
+      ? mat4.multiply(mat4.create(), this._mvpMatrix, rotationMatrix)
+      : this._mvpMatrix;
 
     // Set transformation matrix uniform
-    gl.uniformMatrix4fv(this._compute.modelViewProjectionLocation, false, mvpMatrix);
+    gl.uniformMatrix4fv(
+      this._compute.modelViewProjectionLocation, false, finalMvpMatrix);
 
-    // Set the variable axes and polar configuration for the current slice
+    // Set the polar axis uniform (if applicable)
     const colorSpace = colorSpaceView.colorSpace;
-    const currentAxisIndex = colorSpace.getAxisIndex(colorSpaceView.currentAxis);
-
-    // Calculate the two variable axes (the ones that aren't fixed)
-    const variableAxes = [];
-    for (let i = 0; i < 3; i++) {
-      if (i !== currentAxisIndex) {
-        variableAxes.push(i);
-      }
-    }
-    gl.uniform2iv(this._compute.variableAxesLocation, variableAxes);
-
-    // Set polar angle axis if enabled
-    const polarAxis = colorSpaceView.usePolarCoordinates ?
+    const polarAxis = colorSpaceView.usePolarCoordinates && !rotationMatrix ?
       colorSpaceView.colorSpace.availablePolarAxis(colorSpaceView.currentAxis) : null;
     const polarAxisIndex = polarAxis ? colorSpace.getAxisIndex(polarAxis) : -1;
     gl.uniform1i(this._compute.polarAngleAxisLocation, polarAxisIndex);
 
-    // Set color space uniform
-    gl.uniform1i(this._compute.colorSpaceIndexLocation, getAllColorSpaces().indexOf(colorSpaceView.colorSpace));
+    // Set variable axes (only relevant polar calculations)
+    {
+      const currentAxisIndex = colorSpace.getAxisIndex(colorSpaceView.currentAxis);
 
-    // Set distance metric uniform
+      // Calculate the two variable axes (the ones that aren't fixed)
+      const variableAxes = [];
+      for (let i = 0; i < 3; i++) {
+        if (i !== currentAxisIndex) {
+          variableAxes.push(i);
+        }
+      }
+      gl.uniform2iv(this._compute.variableAxesLocation, variableAxes);
+    }
+
+    // Common uniforms for both modes
+    gl.uniform1i(
+      this._compute.colorSpaceIndexLocation,
+      getAllColorSpaces().indexOf(colorSpaceView.colorSpace)
+    );
     gl.uniform1i(
       this._compute.distanceMetricLocation,
-      getAllDistanceMetrics().indexOf(colorSpaceView.distanceMetric));
-
-    // Set distance threshold uniform
-    gl.uniform1f(this._compute.distanceThresholdLocation, colorSpaceView.distanceThreshold);
+      getAllDistanceMetrics().indexOf(colorSpaceView.distanceMetric)
+    );
+    gl.uniform1f(
+      this._compute.distanceThresholdLocation,
+      colorSpaceView.distanceThreshold);
 
     // Set palette colors uniforms
     const actualCount = Math.min(paletteColors.length, MAX_PALETTE_COLORS);
@@ -400,8 +477,8 @@ export class CanvasRenderer {
     }
     gl.uniform3fv(this._compute.paletteColorsLocation, paletteData);
 
-    // Draw the 3D face to framebuffer
-    gl.drawElements(gl.TRIANGLES, this._faceIndexCount, gl.UNSIGNED_SHORT, 0);
+    // Draw using unified geometry
+    gl.drawElements(gl.TRIANGLES, this._geometry.indexCount, gl.UNSIGNED_SHORT, 0);
   }
 
   /**
@@ -409,7 +486,7 @@ export class CanvasRenderer {
    * @param {boolean} showBoundaries - Whether to show region boundaries
    * @param {number|null} highlightPaletteIndex - Index of palette color to highlight (null for no highlight)
    */
-  _renderPhase(showBoundaries = true, highlightPaletteIndex = null) {
+  _renderToCanvas(showBoundaries = true, highlightPaletteIndex = null) {
     const gl = this._gl;
 
     // Bind default framebuffer (canvas)
@@ -612,5 +689,63 @@ export class CanvasRenderer {
       rgbColor, // RgbColor instance with normalized coordinates
       closestColor // Actual NamedColor object or null
     ];
+  }
+}
+
+class CubeGeometryHelper {
+  /**
+   * Generate all 8 corners of a cube using bit patterns
+   * @param {number} size - Size of the cube
+   * @param {Array<number>} colorAxisOrder - Array of 3 indices mapping [x,y,z] positions to color coordinates [0,1,2]
+   * @returns {Array} Array of 8 corners, each with [x, y, z, colorCoord0, colorCoord1, colorCoord2]
+   */
+  static generateCubeCorners(size, colorAxisOrder = [0, 1, 2]) {
+    const half = size / 2;
+    const corners = [];
+
+    // Generate 8 corners using 3-bit patterns: 000, 001, 010, 011, 100, 101, 110, 111
+    for (let i = 0; i < 8; i++) {
+      const [xBit, yBit, zBit] = [i & 1, (i & 2) >> 1, (i & 4) >> 2];
+
+      // Position coordinates
+      const x = xBit ? half : -half;
+      const y = yBit ? half : -half;
+      const z = zBit ? half : -half;
+
+      // Color coordinates based on axis order mapping
+      const colorCoord = [0, 0, 0];
+      colorCoord[colorAxisOrder[0]] = xBit;
+      colorCoord[colorAxisOrder[1]] = yBit;
+      colorCoord[colorAxisOrder[2]] = zBit;
+
+      corners.push([x, y, z, ...colorCoord]);
+    }
+    return corners;
+  }
+
+  /**
+   * Generate the indices for a single face of the cube
+   * @param {number} baseIndex
+   * @returns
+   */
+  static generateFaceIndexes(baseIndex) {
+    // Each face is a quad made of 2 triangles
+    return [
+      baseIndex, baseIndex + 1, baseIndex + 2,
+      baseIndex + 1, baseIndex + 2, baseIndex + 3
+    ];
+  }
+
+  /**
+   * Generate the 4 corners of a face based on the axis index and direction
+   * @param {number} axisIndex - The index of the fixed axis (0, 1, or 2)
+   * @param {number} direction - The direction of the face (0 or 1)
+   * @returns {Array} Array of 4 corners for the specified face
+   */
+  static filterCornersByFace(corners, axisIndex, direction) {
+    return corners.filter((_, i) => {
+      // Check the bit corresponding to the axis index
+      return ((i >> axisIndex) & 1) === direction;
+    });
   }
 }

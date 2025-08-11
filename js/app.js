@@ -1,5 +1,4 @@
 import { CanvasRenderer } from './canvasRenderer.js';
-import { CubeRenderer } from './cubeRenderer.js';
 import { CanvasUI } from './canvasUI.js';
 import { UIController } from './uiController.js';
 import { getAllColorSpaces, getAllDistanceMetrics, ColorSpaceView, getColorSpaceByType, getDefaultDistanceMetric, getDistanceMetricById } from './colorSpace.js';
@@ -41,8 +40,7 @@ class ColorSpaceExplorer {
   }
 
   async init() {
-    const rendererClass = this._use3D ? CubeRenderer : CanvasRenderer;
-    this._renderer = await rendererClass.create(
+    this._renderer = await CanvasRenderer.create(
       document.querySelector('.canvas-container'));
 
     // Create canvas UI handler
@@ -52,8 +50,8 @@ class ColorSpaceExplorer {
       this._colorDisplay,
       this._colorPalette,
       URLStateManager,
-      this._deferredUpdateRenderer,
-      this._use3D);
+      this._deferredUpdateRenderer);
+    this._canvasUI.setUse3D(this._use3D);
 
     this._updateRenderer(); // No deferral
   }
@@ -65,7 +63,7 @@ class ColorSpaceExplorer {
 
     // Pass rotation matrix for 3D renderer
     if (this._use3D) {
-      this._renderer.renderColorSpace(
+      this._renderer.render3DColorSpace(
         colorSpaceView,
         paletteColors,
         options?.highlightIndex,
@@ -94,15 +92,9 @@ class ColorSpaceExplorer {
 
     this._use3D = use3D;
 
-    // Create new renderer
-    const rendererClass = this._use3D ? CubeRenderer : CanvasRenderer;
-    this._renderer = await rendererClass.create(
-      document.querySelector('.canvas-container'));
-
     // Update canvas UI for new mode
-    this._canvasUI.setRenderer(this._renderer, this._use3D);
+    this._canvasUI.setUse3D(this._use3D);
 
-    // Re-render with new renderer
     this._updateRenderer();
   }
 }
