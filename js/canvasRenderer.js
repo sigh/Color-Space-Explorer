@@ -56,10 +56,10 @@ export class CanvasRenderer {
    */
   static async create(canvasContainer) {
     // Load shaders from files - using original compute_fragment.glsl
-    const [computeVertexShaderSource, computeFragmentShaderSource, vertexShaderSource, renderFragmentShaderSource] = await Promise.all([
-      fetch('./shaders/cube_vertex.glsl').then(r => r.text()),
+    const [computeVertexShaderSource, computeFragmentShaderSource, renderVertexShaderSource, renderFragmentShaderSource] = await Promise.all([
+      fetch('./shaders/compute_vertex.glsl').then(r => r.text()),
       fetch('./shaders/compute_fragment.glsl').then(r => r.text()),
-      fetch('./shaders/vertex.glsl').then(r => r.text()),
+      fetch('./shaders/render_vertex.glsl').then(r => r.text()),
       fetch('./shaders/render_fragment.glsl').then(r => r.text())
     ]);
 
@@ -67,14 +67,14 @@ export class CanvasRenderer {
       canvasContainer,
       computeVertexShaderSource,
       computeFragmentShaderSource,
-      vertexShaderSource,
+      renderVertexShaderSource,
       renderFragmentShaderSource);
   }
 
   /**
    * Initialize WebGL shaders and buffers
    */
-  _initWebGL(computeVertexShaderSource, computeFragmentShaderSource, vertexShaderSource, renderFragmentShaderSource) {
+  _initWebGL(computeVertexShaderSource, computeFragmentShaderSource, renderVertexShaderSource, renderFragmentShaderSource) {
     const gl = this._gl;
 
     // Enable depth testing for 3D
@@ -83,7 +83,7 @@ export class CanvasRenderer {
     // Create and compile shaders
     const computeVertexShader = this._createShader(gl.VERTEX_SHADER, computeVertexShaderSource);
     const computeFragmentShader = this._createShader(gl.FRAGMENT_SHADER, computeFragmentShaderSource);
-    const vertexShader = this._createShader(gl.VERTEX_SHADER, vertexShaderSource);
+    const renderVertexShader = this._createShader(gl.VERTEX_SHADER, renderVertexShaderSource);
     const renderFragmentShader = this._createShader(gl.FRAGMENT_SHADER, renderFragmentShaderSource);
 
     // Create and configure compute program (3D face rendering with original compute_fragment.glsl)
@@ -103,7 +103,7 @@ export class CanvasRenderer {
     };
 
     // Create and configure render program
-    const renderProgram = this._createProgram(vertexShader, renderFragmentShader);
+    const renderProgram = this._createProgram(renderVertexShader, renderFragmentShader);
     this._render = {
       program: renderProgram,
       positionLocation: gl.getAttribLocation(renderProgram, 'a_position'),
