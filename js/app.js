@@ -1,5 +1,6 @@
 import { CanvasRenderer } from './canvasRenderer.js';
 import { CubeRenderer } from './cubeRenderer.js';
+import { CanvasUI } from './canvasUI.js';
 import { UIController } from './uiController.js';
 import { getAllColorSpaces, getAllDistanceMetrics, ColorSpaceView, getColorSpaceByType, getDefaultDistanceMetric, getDistanceMetricById } from './colorSpace.js';
 import { ColorPalette } from './colorPalette.js';
@@ -11,11 +12,8 @@ import { deferUntilAnimationFrame } from './utils.js';
  */
 class ColorSpaceExplorer {
   constructor() {
-    this._canvasContainer = document.querySelector('.canvas-container');
     this._deferredUpdateRenderer = deferUntilAnimationFrame(
       this._updateRenderer.bind(this));
-
-    this._selectionIndicator = null;
 
     const colorDisplayContainer = document.querySelector('.color-display-section');
     this._colorDisplay = new ColorDisplay(colorDisplayContainer);
@@ -44,68 +42,20 @@ class ColorSpaceExplorer {
     const params = new URLSearchParams(window.location.search);
     const use3D = params.has('3d');
 
-    if (use3D) {
-      this._renderer = await CubeRenderer.create(this._canvasContainer);
-    } else {
-      this._renderer = await CanvasRenderer.create(this._canvasContainer);
-    }
+    const rendererClass = use3D ? CubeRenderer : CanvasRenderer;
+    this._renderer = await rendererClass.create(
+      document.querySelector('.canvas-container'));
 
-    // Create a selection indicator - this will get updated as required.
-    const selectionCoords = URLStateManager.deserializeSelectionFromFragment();
-    if (selectionCoords) {
-      this._placeSelectionIndicator(...selectionCoords);
-    }
-
-    this._setupMouseHandlers();
+    // Create canvas UI handler
+    this._canvasUI = new CanvasUI(
+      document.querySelector('.canvas-panel'),
+      this._renderer,
+      this._colorDisplay,
+      this._colorPalette,
+      URLStateManager
+    );
 
     this._updateRenderer(); // No deferral
-  }
-
-  /**
-   * Initialize selection from URL fragment if coordinates are present
-   */
-  async _recalculateSelection() {
-    if (!this._selectionIndicator) return;
-
-    // Use requestAnimationFrame to ensure the render is complete
-    await this._renderer.waitForCurrentRender();
-
-    // Check that we still have a selection indicator after waiting
-    if (!this._selectionIndicator) return;
-    const coordinates = this._selectionIndicator.dataset.coordinates?.split(',').map(Number);
-
-    const [rgbColor, closestColor] = this._renderer.getColorAt(...coordinates);
-
-    // Set as selected if we have a valid color, otherwise clear selection
-    if (rgbColor !== null) {
-      this._setSelection(coordinates, rgbColor, closestColor);
-    } else {
-      this._clearSelection();
-    }
-  }
-
-  /**
-   * Set the selected color
-   * @param {Array<number>} coordinates - Canvas coordinates as [x, y]
-   * @param {Array<number>} rgbColor - RGB color value as [r, g, b]
-   * @param {Array<number>} closestColor - Closest color value as [r, g, b]
-   */
-  _setSelection(coordinates, rgbColor, closestColor) {
-    this._placeSelectionIndicator(...coordinates);
-    this._colorDisplay.setSelectedColors(rgbColor, closestColor);
-    URLStateManager.serializeSelectionToFragment(coordinates);
-  }
-
-  /**
-   * Clear the current selection
-   */
-  _clearSelection() {
-    if (this._selectionIndicator) {
-      this._selectionIndicator.remove();
-      this._selectionIndicator = null;
-      this._colorDisplay.clearColors();
-      URLStateManager.serializeSelectionToFragment(null);
-    }
   }
 
   _updateRenderer(options) {
@@ -120,123 +70,7 @@ class ColorSpaceExplorer {
     // Serialize state to URL whenever we render
     URLStateManager.serializeColorSpaceViewToURL(colorSpaceView);
 
-    this._recalculateSelection();
-  }
-
-  _setupMouseHandlers() {
-    const getCanvasCoordsFromMouseEvent = (event) => {
-      const rect = this._canvasContainer.getBoundingClientRect();
-      const x = event.clientX - rect.left;
-      const y = event.clientY - rect.top;
-      return [x, y];
-    };
-
-    // Check if we're using 3D renderer
-    const is3DRenderer = this._renderer instanceof CubeRenderer;
-
-    // Mouse move handler for hover effect (skip for 3D renderer)
-    this._canvasContainer.addEventListener('mousemove', (event) => {
-      // Skip hover updates if there's a selection
-      if (this._selectionIndicator) return;
-
-      const [x, y] = getCanvasCoordsFromMouseEvent(event);
-      const [rgbColor, closestColor] = this._renderer.getColorAt(x, y);
-
-      if (rgbColor === null) {
-        this._colorDisplay.clearColors();
-        return;
-      }
-
-      this._colorDisplay.setColors(rgbColor, closestColor);
-    });
-
-    // Mouse leave handler to reset to default (skip for 3D renderer)
-    this._canvasContainer.addEventListener('mouseleave', () => {
-      // Skip clearing if there's a selection
-      if (this._selectionIndicator) return;
-
-      this._colorDisplay.clearColors();
-    });
-
-    // Click handler for canvas panel (skip for 3D renderer)
-    const centerPanel = document.querySelector('.canvas-panel');
-    centerPanel.addEventListener('click', (event) => {
-      if (is3DRenderer) return; // Let 3D renderer handle its own mouse events
-
-      const selectionClicked = event.target === this._selectionIndicator;
-      const [x, y] = getCanvasCoordsFromMouseEvent(event);
-      const [rgbColor, closestColor] = this._renderer.getColorAt(x, y);
-
-      // Handle command-click or ctrl-click for direct color addition
-      if ((event.metaKey || event.ctrlKey)) {
-        // Try to add the color to the palette
-        if (rgbColor !== null && this._colorPalette.addColor(rgbColor, closestColor)) {
-          // Show brief visual feedback at click location
-          this._showAddFeedback(x, y);
-        }
-        return; // Don't proceed with normal click handling
-      }
-
-      this._clearSelection();
-
-      if (rgbColor === null) {
-        this._colorDisplay.clearColors();
-        return;
-      }
-
-      if (!selectionClicked) {
-        this._setSelection([x, y], rgbColor, closestColor);
-      } else {
-        this._colorDisplay.setColors(rgbColor, closestColor);
-      }
-    });
-  }
-
-  /**
-   * Create visual selection indicator
-   * @param {number} x - X coordinate relative to canvas
-   * @param {number} y - Y coordinate relative to canvas
-   */
-  _placeSelectionIndicator(x, y) {
-    if (!this._selectionIndicator) {
-      // Create indicator element positioned absolutely within canvas container
-      this._selectionIndicator = document.createElement('div');
-      this._selectionIndicator.className = 'selection-indicator';
-
-      // Append to canvas container
-      this._canvasContainer.appendChild(this._selectionIndicator);
-    }
-
-    x = Math.round(x);
-    y = Math.round(y);
-
-    // Position absolutely within the canvas container (CSS handles centering)
-    this._selectionIndicator.style.left = `${x}px`;
-    this._selectionIndicator.style.top = `${y}px`;
-
-    // Store the coordinates in the data attribute
-    this._selectionIndicator.dataset.coordinates = `${x},${y}`;
-  }
-
-  /**
-   * Show brief visual feedback when a color is added via command-click
-   * @param {number} x - X coordinate relative to canvas
-   * @param {number} y - Y coordinate relative to canvas
-   */
-  _showAddFeedback(x, y) {
-    // Create feedback element
-    const feedback = document.createElement('div');
-    feedback.className = 'add-feedback';
-
-    // Position absolutely within the canvas container
-    feedback.style.left = `${x}px`;
-    feedback.style.top = `${y}px`;
-
-    // Append to canvas container
-    this._canvasContainer.appendChild(feedback);
-
-    // Remove after animation completes
-    setTimeout(() => { feedback.remove(); }, 800);
+    this._canvasUI.recalculateSelection();
   }
 }
 
