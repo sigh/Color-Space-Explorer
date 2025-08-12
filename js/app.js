@@ -1,7 +1,7 @@
 import { CanvasRenderer } from './canvasRenderer.js';
 import { CanvasUI } from './canvasUI.js';
-import { ConfigurationController } from './configurationController.js';
-import { getAllColorSpaces, getAllDistanceMetrics, ColorSpaceView, getColorSpaceByType, getDefaultDistanceMetric, getDistanceMetricById } from './colorSpace.js';
+import { ConfigurationController, ColorSpaceConfig } from './configurationController.js';
+import { getAllColorSpaces, getAllDistanceMetrics, getColorSpaceByType, getDefaultDistanceMetric, getDistanceMetricById } from './colorSpace.js';
 import { ColorPalette } from './colorPalette.js';
 import { ColorDisplay } from './colorDisplay.js';
 import { deferUntilAnimationFrame } from './utils.js';
@@ -31,11 +31,11 @@ class ColorSpaceExplorer {
       this._updateRenderer.bind(this));
 
     // Try to load state from URL, otherwise use defaults
-    const initialColorSpaceView = URLStateManager.deserializeColorSpaceViewFromURL();
+    const initialColorSpaceConfig = URLStateManager.deserializeColorSpaceConfigFromURL();
 
-    this._configurationController = new ConfigurationController(
+    this._configController = new ConfigurationController(
       document.querySelector('.control-panel'),
-      initialColorSpaceView,
+      initialColorSpaceConfig,
       this._deferredUpdateRenderer.bind(this));
   }
 
@@ -58,27 +58,27 @@ class ColorSpaceExplorer {
 
   _updateRenderer(options) {
     if (!this._renderer) return;
-    const colorSpaceView = this._configurationController.getCurrentColorSpaceView();
+    const colorSpaceConfig = this._configController.getCurrentColorSpaceConfig();
     const paletteColors = this._colorPalette.getColors();
 
     // Pass rotation matrix for 3D renderer
     if (this._use3D) {
       this._renderer.render3DColorSpace(
-        colorSpaceView,
+        colorSpaceConfig,
         paletteColors,
         options?.highlightIndex,
         this._canvasUI.getRotationMatrix()
       );
     } else {
       this._renderer.renderColorSpace(
-        colorSpaceView,
+        colorSpaceConfig,
         paletteColors,
         options?.highlightIndex
       );
     }
 
     // Serialize state to URL whenever we render
-    URLStateManager.serializeColorSpaceViewToURL(colorSpaceView);
+    URLStateManager.serializeColorSpaceConfigToURL(colorSpaceConfig);
 
     this._canvasUI.recalculateSelection();
   }
@@ -104,20 +104,20 @@ class ColorSpaceExplorer {
  */
 class URLStateManager {
   /**
-   * Serialize ColorSpaceView to URL parameters
-   * @param {ColorSpaceView} colorSpaceView - The view to serialize
+   * Serialize ColorSpaceConfig to URL parameters
+   * @param {ColorSpaceConfig} colorSpaceConfig - The configuration to serialize
    */
-  static serializeColorSpaceViewToURL(colorSpaceView) {
+  static serializeColorSpaceConfigToURL(colorSpaceConfig) {
     const params = new URLSearchParams();
-    params.set('space', colorSpaceView.colorSpace.getType());
-    params.set(colorSpaceView.currentAxis.key, colorSpaceView.currentValue.toString());
-    const distanceMetric = colorSpaceView.distanceMetric;
+    params.set('space', colorSpaceConfig.colorSpace.getType());
+    params.set(colorSpaceConfig.currentAxis.key, colorSpaceConfig.currentValue.toString());
+    const distanceMetric = colorSpaceConfig.distanceMetric;
     params.set(
       distanceMetric.id,
-      distanceMetric.thresholdToString(colorSpaceView.distanceThreshold));
+      distanceMetric.thresholdToString(colorSpaceConfig.distanceThreshold));
 
-    const regionsParam = colorSpaceView.showBoundaries ? '' : '&noregions';
-    const polarParam = colorSpaceView.usePolarCoordinates ? '&polar' : '';
+    const regionsParam = colorSpaceConfig.showBoundaries ? '' : '&noregions';
+    const polarParam = colorSpaceConfig.usePolarCoordinates ? '&polar' : '';
 
     // Preserve the 3d parameter if it exists
     const current3dParam = new URLSearchParams(window.location.search).has('3d') ? '&3d' : '';
@@ -166,10 +166,10 @@ class URLStateManager {
   }
 
   /**
-   * Deserialize ColorSpaceView from URL parameters
-   * @returns {ColorSpaceView} ColorSpaceView instance, or a default view if parameters are invalid
+   * Deserialize ColorSpaceConfig from URL parameters
+   * @returns {ColorSpaceConfig} ColorSpaceConfig instance, or a default configuration if parameters are invalid
    */
-  static deserializeColorSpaceViewFromURL() {
+  static deserializeColorSpaceConfigFromURL() {
     const params = new URLSearchParams(window.location.search);
 
     // Lookup the color space, or default to the first available.
@@ -210,7 +210,7 @@ class URLStateManager {
       }
     }
 
-    return new ColorSpaceView(colorSpace, axis, value, showBoundaries, usePolarCoordinates, distanceMetric, threshold);
+    return new ColorSpaceConfig(colorSpace, axis, value, showBoundaries, usePolarCoordinates, distanceMetric, threshold);
   }
 }
 

@@ -33,24 +33,6 @@ export class Axis {
 }
 
 /**
- * Immutable color space view - a simple container for current axis and value
- */
-export class ColorSpaceView {
-  constructor(colorSpace, currentAxis, currentValue, showBoundaries = true, usePolarCoordinates = false, distanceMetric = null, distanceThreshold = null) {
-    this.colorSpace = colorSpace;
-    this.currentAxis = currentAxis;
-    this.currentValue = currentValue;
-    this.showBoundaries = showBoundaries;
-    this.usePolarCoordinates = usePolarCoordinates;
-    this.distanceMetric = distanceMetric || getDefaultDistanceMetric();
-    this.distanceThreshold = distanceThreshold ?? this.distanceMetric.maxThreshold;
-
-    // Freeze the object to make it immutable
-    Object.freeze(this);
-  }
-}
-
-/**
  * Immutable color space configuration class
  * Contains all the semantic information about a color space
  */

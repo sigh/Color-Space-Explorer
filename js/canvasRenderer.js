@@ -245,18 +245,18 @@ export class CanvasRenderer {
   }
 
   /**
-   * Generate face geometry data for a specific color space view
-   * @param {ColorSpaceView} colorSpaceView - The color space view
+   * Generate face geometry data for a specific color space configuration
+   * @param {ColorSpaceConfig} colorSpaceConfig - The color space configuration
    * @returns {Object} Object with vertices and indices arrays
    */
-  _generateFaceGeometry(colorSpaceView) {
+  _generateFaceGeometry(colorSpaceConfig) {
     // Calculate size to fill the viewport at the 2D camera distance
     const size = calculateViewportSize(CAMERA_DISTANCE);
 
-    // Generate face based on the color space view using cube renderer techniques
-    const colorSpace = colorSpaceView.colorSpace;
-    const currentAxisIndex = colorSpace.getAxisIndex(colorSpaceView.currentAxis);
-    const fixedValue = colorSpaceView.currentValue / colorSpaceView.currentAxis.max; // Normalized to [0,1]
+    // Generate face based on the color space configuration using cube renderer techniques
+    const colorSpace = colorSpaceConfig.colorSpace;
+    const currentAxisIndex = colorSpace.getAxisIndex(colorSpaceConfig.currentAxis);
+    const fixedValue = colorSpaceConfig.currentValue / colorSpaceConfig.currentAxis.max; // Normalized to [0,1]
 
     // Create color axis mapping where:
     // - X position maps to first variable axis
@@ -344,38 +344,38 @@ export class CanvasRenderer {
 
   /**
    * Render a 3D face representing the color space
-   * @param {ColorSpaceView} colorSpaceView - Immutable color space view
+   * @param {ColorSpaceConfig} colorSpaceConfig
    * @param {Array<NamedColor>} paletteColors - Array of palette colors to find closest matches for
    * @param {number|null} highlightPaletteIndex - Index of palette color to highlight (null for no highlight)
    */
-  renderColorSpace(colorSpaceView, paletteColors = [], highlightPaletteIndex = null) {
+  renderColorSpace(colorSpaceConfig, paletteColors = [], highlightPaletteIndex = null) {
     // Store palette colors for consistency with indices
     this._paletteColors = [...paletteColors];
 
     // Regenerate 2D face geometry
-    const { vertices, indices } = this._generateFaceGeometry(colorSpaceView);
+    const { vertices, indices } = this._generateFaceGeometry(colorSpaceConfig);
     this._createGeometry(vertices, indices);
 
     // First phase: Render 3D face to framebuffer for color computation
-    this._renderToFramebuffer(colorSpaceView, paletteColors);
+    this._renderToFramebuffer(colorSpaceConfig, paletteColors);
 
     // Second phase: Display framebuffer texture to canvas
-    this._renderToCanvas(colorSpaceView.showBoundaries, highlightPaletteIndex);
+    this._renderToCanvas(colorSpaceConfig.showBoundaries, highlightPaletteIndex);
 
-    // Update axis labels for the current color space view (maintain 2D functionality)
-    const polarAxis = colorSpaceView.usePolarCoordinates ?
-      colorSpaceView.colorSpace.availablePolarAxis(colorSpaceView.currentAxis) : null;
-    this._updateAxisLabels(colorSpaceView, polarAxis);
+    // Update axis labels for the current color space configuration (maintain 2D functionality)
+    const polarAxis = colorSpaceConfig.usePolarCoordinates ?
+      colorSpaceConfig.colorSpace.availablePolarAxis(colorSpaceConfig.currentAxis) : null;
+    this._updateAxisLabels(colorSpaceConfig, polarAxis);
   }
 
   /**
    * Render a 3D color space cube with rotation (same functionality as CubeRenderer)
-   * @param {ColorSpaceView} colorSpaceView - Immutable color space view
+   * @param {ColorSpaceConfig} colorSpaceConfig
    * @param {Array<NamedColor>} paletteColors - Array of palette colors to find closest matches for
    * @param {number|null} highlightPaletteIndex - Index of palette color to highlight (null for no highlight)
    * @param {Float32Array} rotationMatrix - 4x4 rotation matrix for the cube
    */
-  render3DColorSpace(colorSpaceView, paletteColors = [], highlightPaletteIndex = null, rotationMatrix = null) {
+  render3DColorSpace(colorSpaceConfig, paletteColors = [], highlightPaletteIndex = null, rotationMatrix = null) {
     // Store palette colors for consistency with indices
     this._paletteColors = [...paletteColors];
 
@@ -384,19 +384,19 @@ export class CanvasRenderer {
     this._createGeometry(vertices, indices);
 
     // First phase: Render 3D cube to framebuffer for color computation
-    this._renderToFramebuffer(colorSpaceView, paletteColors, rotationMatrix);
+    this._renderToFramebuffer(colorSpaceConfig, paletteColors, rotationMatrix);
 
     // Second phase: Display framebuffer texture to canvas
-    this._renderToCanvas(colorSpaceView.showBoundaries, highlightPaletteIndex);
+    this._renderToCanvas(colorSpaceConfig.showBoundaries, highlightPaletteIndex);
   }
 
   /**
    * Compute colors into the framebuffer
-   * @param {ColorSpaceView} colorSpaceView - Immutable color space view
+   * @param {ColorSpaceConfig} colorSpaceConfig
    * @param {Array<NamedColor>} paletteColors - Array of palette colors to find closest matches for
    * @param {Float32Array} rotationMatrix - 4x4 rotation matrix for the cube (only used for 3D)
    */
-  _renderToFramebuffer(colorSpaceView, paletteColors, rotationMatrix = null) {
+  _renderToFramebuffer(colorSpaceConfig, paletteColors, rotationMatrix = null) {
     const gl = this._gl;
 
     // Bind framebuffer for rendering
@@ -429,15 +429,15 @@ export class CanvasRenderer {
       this._compute.modelViewProjectionLocation, false, finalMvpMatrix);
 
     // Set the polar axis uniform (if applicable)
-    const colorSpace = colorSpaceView.colorSpace;
-    const polarAxis = colorSpaceView.usePolarCoordinates && !rotationMatrix ?
-      colorSpaceView.colorSpace.availablePolarAxis(colorSpaceView.currentAxis) : null;
+    const colorSpace = colorSpaceConfig.colorSpace;
+    const polarAxis = colorSpaceConfig.usePolarCoordinates && !rotationMatrix ?
+      colorSpaceConfig.colorSpace.availablePolarAxis(colorSpaceConfig.currentAxis) : null;
     const polarAxisIndex = polarAxis ? colorSpace.getAxisIndex(polarAxis) : -1;
     gl.uniform1i(this._compute.polarAngleAxisLocation, polarAxisIndex);
 
     // Set variable axes (only relevant polar calculations)
     {
-      const currentAxisIndex = colorSpace.getAxisIndex(colorSpaceView.currentAxis);
+      const currentAxisIndex = colorSpace.getAxisIndex(colorSpaceConfig.currentAxis);
 
       // Calculate the two variable axes (the ones that aren't fixed)
       const variableAxes = [];
@@ -452,15 +452,15 @@ export class CanvasRenderer {
     // Common uniforms for both modes
     gl.uniform1i(
       this._compute.colorSpaceIndexLocation,
-      getAllColorSpaces().indexOf(colorSpaceView.colorSpace)
+      getAllColorSpaces().indexOf(colorSpaceConfig.colorSpace)
     );
     gl.uniform1i(
       this._compute.distanceMetricLocation,
-      getAllDistanceMetrics().indexOf(colorSpaceView.distanceMetric)
+      getAllDistanceMetrics().indexOf(colorSpaceConfig.distanceMetric)
     );
     gl.uniform1f(
       this._compute.distanceThresholdLocation,
-      colorSpaceView.distanceThreshold);
+      colorSpaceConfig.distanceThreshold);
 
     // Set palette colors uniforms
     const actualCount = Math.min(paletteColors.length, MAX_PALETTE_COLORS);
@@ -523,11 +523,11 @@ export class CanvasRenderer {
   }
 
   /**
-   * Update axis labels and tick marks for the current color space view
-   * @param {ColorSpaceView} colorSpaceView - Current color space view
+   * Update axis labels and tick marks for the current color space configuration
+   * @param {ColorSpaceConfig} colorSpaceConfig - Current color space configuration
    * @param {Axis|null} polarAxis - Axis to use for polar coordinates, or null if not polar display
    */
-  _updateAxisLabels(colorSpaceView, polarAxis) {
+  _updateAxisLabels(colorSpaceConfig, polarAxis) {
     // Clear existing labels by emptying the axis container
     clearElement(this._axisContainer);
 
@@ -538,9 +538,9 @@ export class CanvasRenderer {
 
     // For regular cartesian coordinates, we need to figure out which axes to display.
 
-    const colorSpace = colorSpaceView.colorSpace;
+    const colorSpace = colorSpaceConfig.colorSpace;
     const axes = colorSpace.getAllAxes();
-    const currentAxisIndex = colorSpace.getAxisIndex(colorSpaceView.currentAxis);
+    const currentAxisIndex = colorSpace.getAxisIndex(colorSpaceConfig.currentAxis);
 
     // Get the two variable axes (non-fixed)
     const variableAxes = axes.filter((_, index) => index !== currentAxisIndex);

@@ -1,11 +1,29 @@
 import { clearElement, createElement } from './utils.js';
-import { ColorSpaceView, getAllColorSpaces, getAllDistanceMetrics, getDistanceMetricById } from './colorSpace.js';
+import { getAllColorSpaces, getAllDistanceMetrics, getDistanceMetricById, getDefaultDistanceMetric } from './colorSpace.js';
+
+/**
+ * Immutable color space configuration - a simple container for current axis and value
+ */
+export class ColorSpaceConfig {
+  constructor(colorSpace, currentAxis, currentValue, showBoundaries = true, usePolarCoordinates = false, distanceMetric = null, distanceThreshold = null) {
+    this.colorSpace = colorSpace;
+    this.currentAxis = currentAxis;
+    this.currentValue = currentValue;
+    this.showBoundaries = showBoundaries;
+    this.usePolarCoordinates = usePolarCoordinates;
+    this.distanceMetric = distanceMetric || getDefaultDistanceMetric();
+    this.distanceThreshold = distanceThreshold ?? this.distanceMetric.maxThreshold;
+
+    // Freeze the object to make it immutable
+    Object.freeze(this);
+  }
+}
 
 /**
  * Configuration controller for handling axis controls and boundaries toggle
  */
 export class ConfigurationController {
-  constructor(container, initialColorSpaceView, onColorSpaceChange) {
+  constructor(container, initialColorSpaceConfig, onColorSpaceChange) {
     // Axis control elements
     this._axisSlider = container.querySelector('.axis-slider');
     this._axisValue = container.querySelector('.axis-slider-value');
@@ -28,7 +46,7 @@ export class ConfigurationController {
     // Callback
     this._onColorViewUpdate = onColorSpaceChange;
 
-    // Initialize the UI with the provided color space view
+    // Initialize the UI with the provided color space configuration
     this._boundariesToggle.addEventListener('change', () => {
       this._onColorViewUpdate();
     });
@@ -47,33 +65,33 @@ export class ConfigurationController {
       this._onColorViewUpdate();
     });
 
-    this._setupColorSpaceControls(container, initialColorSpaceView);
-    this._setupDistanceMetricsDropdown(initialColorSpaceView.distanceMetric);
-    this._setupDistanceThresholdSlider(initialColorSpaceView);
+    this._setupColorSpaceControls(container, initialColorSpaceConfig);
+    this._setupDistanceMetricsDropdown(initialColorSpaceConfig.distanceMetric);
+    this._setupDistanceThresholdSlider(initialColorSpaceConfig);
 
-    // Set the current state from the view
-    this._axisSlider.value = initialColorSpaceView.currentValue;
+    // Set the current state from the config
+    this._axisSlider.value = initialColorSpaceConfig.currentValue;
     this._updateSliderLabel(
-      initialColorSpaceView.currentAxis, initialColorSpaceView.currentValue);
-    this._boundariesToggle.checked = initialColorSpaceView.showBoundaries;
-    this._polarToggle.checked = initialColorSpaceView.usePolarCoordinates;
+      initialColorSpaceConfig.currentAxis, initialColorSpaceConfig.currentValue);
+    this._boundariesToggle.checked = initialColorSpaceConfig.showBoundaries;
+    this._polarToggle.checked = initialColorSpaceConfig.usePolarCoordinates;
   }
 
   /**
    * Initialize color space controls
-   * @param {ColorSpace} initialColorSpaceView - Initial color space
+   * @param {ColorSpace} initialColorSpaceConfig - Initial color space
    * @param {HTMLElement} container - Container element for controls
    */
-  _setupColorSpaceControls(container, initialColorSpaceView) {
+  _setupColorSpaceControls(container, initialColorSpaceConfig) {
     // Set up slider event listener
     this._axisSlider.addEventListener('input', (event) => {
       this._updateSliderLabel(this._currentAxis, event.target.value);
       this._onColorViewUpdate();
     });
 
-    this._setupColorSpaceButtons(container, initialColorSpaceView.colorSpace);
+    this._setupColorSpaceButtons(container, initialColorSpaceConfig.colorSpace);
     this._selectColorSpace(
-      initialColorSpaceView.colorSpace, initialColorSpaceView.currentAxis);
+      initialColorSpaceConfig.colorSpace, initialColorSpaceConfig.currentAxis);
   }
 
   /**
@@ -133,15 +151,15 @@ export class ConfigurationController {
   }
 
   /**
-   * Set distance threshold slider from a ColorSpaceView
-   * @param {ColorSpaceView} view - The color space view containing threshold
+   * Set distance threshold slider from a ColorSpaceConfig
+   * @param {ColorSpaceConfig} config - The color space configuration containing threshold
    */
-  _setupDistanceThresholdSlider(view) {
+  _setupDistanceThresholdSlider(config) {
     this._distanceThresholdSlider.min = 0;
     this._distanceThresholdSlider.max = 100;
     this._distanceThresholdSlider.step = 1;
 
-    const logValue = toLogThreshold(view.distanceMetric, view.distanceThreshold);
+    const logValue = toLogThreshold(config.distanceMetric, config.distanceThreshold);
 
     this._distanceThresholdSlider.value = logValue;
 
@@ -252,14 +270,14 @@ export class ConfigurationController {
   }
 
   /**
-   * Get the current color space view based on current UI state
-   * @returns {ColorSpaceView} Current color space view
+   * Get the current color space configuration based on current UI state
+   * @returns {ColorSpaceConfig} Current color space configuration
    */
-  getCurrentColorSpaceView() {
+  getCurrentColorSpaceConfig() {
     const metric = getDistanceMetricById(this._distanceMetricDropdown.value);
     const threshold = fromLogThreshold(metric, this._distanceThresholdSlider.value);
 
-    return new ColorSpaceView(
+    return new ColorSpaceConfig(
       this._colorSpace,
       this._currentAxis,
       parseInt(this._axisSlider.value),
