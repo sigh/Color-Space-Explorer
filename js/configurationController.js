@@ -1,5 +1,6 @@
 import { clearElement, createElement } from './utils.js';
-import { getAllColorSpaces, getAllDistanceMetrics, getDistanceMetricById, getDefaultDistanceMetric } from './colorSpace.js';
+import { getAllColorSpaces, getAllDistanceMetrics, getDistanceMetricById, getDefaultDistanceMetric, Axis } from './colorSpace.js';
+import { RangeSlider } from './rangeSlider.js';
 
 /**
  * Immutable color space configuration - a simple container for current axis and value
@@ -47,11 +48,11 @@ export class ColorSpaceConfig {
 export class ConfigurationController {
   constructor(container, initialColorSpaceConfig, onColorSpaceChange) {
     // Axis control elements
-    this._axisSlider = container.querySelector('.axis-slider');
-    this._axisValue = container.querySelector('.axis-slider-value');
     this._axisLabel = container.querySelector('.axis-label');
     this._axisSelector = container.querySelector('.axis-selector');
     this._2dOnlyControls = container.querySelectorAll('.only-2d');
+
+    this._render3d = initialColorSpaceConfig.render3d;
 
     // Boundaries toggle element
     this._boundariesToggle = container.querySelector('.boundaries-toggle');
@@ -62,10 +63,6 @@ export class ConfigurationController {
     // Distance metric dropdown element
     this._distanceMetricDropdown = container.querySelector('.distance-metric-dropdown');
 
-    // Distance threshold slider elements
-    this._distanceThresholdSlider = container.querySelector('.distance-threshold-slider');
-    this._distanceThresholdLabel = container.querySelector('.distance-threshold-value');
-
     // Callback
     this._onColorViewUpdate = onColorSpaceChange;
 
@@ -75,16 +72,6 @@ export class ConfigurationController {
     });
 
     this._polarToggle.addEventListener('change', () => {
-      this._onColorViewUpdate();
-    });
-
-    this._distanceMetricDropdown.addEventListener('change', () => {
-      this._updateDistanceThresholdLabel();
-      this._onColorViewUpdate();
-    });
-
-    this._distanceThresholdSlider.addEventListener('input', () => {
-      this._updateDistanceThresholdLabel();
       this._onColorViewUpdate();
     });
 
@@ -102,14 +89,10 @@ export class ConfigurationController {
 
     this._setupColorSpaceControls(container, initialColorSpaceConfig);
     this._setupDistanceMetricsDropdown(initialColorSpaceConfig.distanceMetric);
-    this._setupDistanceThresholdSlider(initialColorSpaceConfig);
+    this._setupDistanceThresholdSlider(container, initialColorSpaceConfig);
 
     // Set the current state from the config
-    this._render3d = initialColorSpaceConfig.render3d;
     if (!this._render3d) {
-      this._axisSlider.value = initialColorSpaceConfig.config2d.currentValue;
-      this._updateSliderLabel(
-        initialColorSpaceConfig.config2d.currentAxis, initialColorSpaceConfig.config2d.currentValue);
       this._polarToggle.checked = initialColorSpaceConfig.config2d.usePolarCoordinates;
     }
     this._boundariesToggle.checked = initialColorSpaceConfig.showBoundaries;
@@ -133,15 +116,42 @@ export class ConfigurationController {
    * @param {HTMLElement} container - Container element for controls
    */
   _setupColorSpaceControls(container, initialColorSpaceConfig) {
-    // Set up slider event listener
-    this._axisSlider.addEventListener('input', (event) => {
-      this._updateSliderLabel(this._currentAxis, event.target.value);
-      this._onColorViewUpdate();
-    });
+    const axisSlider2d = container.querySelector('.axis-value-controls-2d');
+
+    this._axisRangeSlider = this._makeLabeledSlider(
+      axisSlider2d,
+      (value) => `${value}${this._currentAxis.unit}`);
 
     this._setupColorSpaceButtons(container, initialColorSpaceConfig.colorSpace);
     this._selectColorSpace(
       initialColorSpaceConfig.colorSpace, initialColorSpaceConfig.config2d?.currentAxis);
+
+    if (!this._render3d) {
+      this._axisRangeSlider.setValue(initialColorSpaceConfig.config2d.currentValue);
+    }
+  }
+
+  /**
+   * Create a labeled slider
+   * @param {HTMLElement} container
+   * @param {function} toString - Function to convert slider value to string
+   * @returns
+   */
+  _makeLabeledSlider(container, toString) {
+    container.classList.add('slider-container');
+
+    const axisValue = document.createElement('span');
+    axisValue.className = 'slider-display-value';
+    const axisRangeSlider = new RangeSlider(
+      container,
+      {
+        onChange: (value) => {
+          axisValue.textContent = toString(value);
+          this._onColorViewUpdate();
+        }
+      });
+    container.appendChild(axisValue);
+    return axisRangeSlider;
   }
 
   /**
@@ -197,33 +207,35 @@ export class ConfigurationController {
       this._distanceMetricDropdown.appendChild(option);
     });
 
+    this._distanceMetricDropdown.addEventListener('change', () => {
+      this._distanceThresholdSlider.setValue(
+        this._distanceThresholdSlider.getValue());
+      this._onColorViewUpdate();
+    });
+
     this._distanceMetricDropdown.value = initialMetric.id;
   }
 
   /**
    * Set distance threshold slider from a ColorSpaceConfig
+   * @param {HTMLElement} container - The container element for the slider
    * @param {ColorSpaceConfig} config - The color space configuration containing threshold
    */
-  _setupDistanceThresholdSlider(config) {
-    this._distanceThresholdSlider.min = 0;
-    this._distanceThresholdSlider.max = 100;
-    this._distanceThresholdSlider.step = 1;
+  _setupDistanceThresholdSlider(container, config) {
+    this._distanceThresholdSlider = this._makeLabeledSlider(
+      container.querySelector('.distance-threshold-slider'),
+      (value) => {
+        const metric = getDistanceMetricById(this._distanceMetricDropdown.value);
+        const threshold = fromLogThreshold(metric, value);
+        return metric.thresholdToString(threshold);
+      }
+    );
+
+    this._distanceThresholdSlider.setRange(0, 100);
 
     const logValue = toLogThreshold(config.distanceMetric, config.distanceThreshold);
 
-    this._distanceThresholdSlider.value = logValue;
-
-    this._updateDistanceThresholdLabel();
-  }
-
-  /**
-   * Update the distance threshold label based on current slider value
-   */
-  _updateDistanceThresholdLabel() {
-    const metric = getDistanceMetricById(this._distanceMetricDropdown.value);
-    const threshold = fromLogThreshold(metric, this._distanceThresholdSlider.value);
-
-    this._distanceThresholdLabel.textContent = metric.thresholdToString(threshold);
+    this._distanceThresholdSlider.setValue(logValue);
   }
 
   /**
@@ -287,12 +299,9 @@ export class ConfigurationController {
   _selectAxis(axis) {
     this._currentAxis = axis;
 
-    // Set up slider.
-    this._axisSlider.min = axis.min;
-    this._axisSlider.max = axis.max;
-    this._axisSlider.value = axis.defaultValue;
-
-    this._updateSliderLabel(axis, axis.defaultValue);
+    this._axisRangeSlider.setRange(axis.min, axis.max);
+    this._axisRangeSlider.setValue(axis.defaultValue);
+    this._axisLabel.textContent = axis.name;
 
     // Update polar toggle visibility
     this._updatePolarToggleVisibility();
@@ -310,27 +319,17 @@ export class ConfigurationController {
   }
 
   /**
-   * Update slider labels
-   * @param {Axis} axis - The axis being updated
-   * @param {number} value - The current value of the axis
-   */
-  _updateSliderLabel(axis, value) {
-    this._axisLabel.textContent = axis.name;
-    this._axisValue.textContent = `${value}${axis.unit}`;
-  }
-
-  /**
    * Get the current color space configuration based on current UI state
    * @returns {ColorSpaceConfig} Current color space configuration
    */
   getCurrentColorSpaceConfig() {
     const metric = getDistanceMetricById(this._distanceMetricDropdown.value);
-    const threshold = fromLogThreshold(metric, this._distanceThresholdSlider.value);
+    const threshold = fromLogThreshold(metric, this._distanceThresholdSlider.getValue());
 
     // Only collect 2D config if in 2D mode
     const config2d = this._render3d ? null : {
       currentAxis: this._currentAxis,
-      currentValue: parseInt(this._axisSlider.value),
+      currentValue: parseInt(this._axisRangeSlider.getValue()),
       usePolarCoordinates: this._polarToggle.checked && this._colorSpace.availablePolarAxis(this._currentAxis)
     };
 
@@ -344,7 +343,6 @@ export class ConfigurationController {
     );
   }
 }
-
 
 /**
  * Convert a threshold value to a logarithmic scale

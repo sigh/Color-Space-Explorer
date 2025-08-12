@@ -292,7 +292,56 @@ h3 {
   appearance: none;
 }
 
-.slider-container span {
+/* Range slider track container */
+.range-slider-track {
+  position: relative;
+  flex: 1;
+  height: 20px;
+  cursor: pointer;
+}
+
+/* Range slider track background */
+.range-slider-background {
+  position: absolute;
+  top: 50%;
+  left: 0;
+  right: 0;
+  height: 6px;
+  background: var(--bg-surface);
+  border: 1px solid var(--bg-surface-hover);
+  border-radius: var(--radius-slider);
+  transform: translateY(-50%);
+}
+
+/* Range slider active range */
+.range-slider-active {
+  position: absolute;
+  top: 50%;
+  height: 6px;
+  background: var(--accent-primary);
+  border-radius: var(--radius-slider);
+  transform: translateY(-50%);
+}
+
+/* Range slider thumbs */
+.range-slider-thumb {
+  position: absolute;
+  top: 50%;
+  width: 16px;
+  height: 16px;
+  background: var(--accent-primary);
+  border-radius: 50%;
+  transform: translate(-50%, -50%);
+  cursor: grab;
+  box-shadow: 0 1px 3px rgba(0, 0, 0, 0.3);
+  z-index: 2;
+}
+
+.range-slider-thumb:hover {
+  background: var(--accent-hover);
+}
+
+.slider-display-value {
   color: var(--text-secondary);
   font-family: var(--font-mono);
   font-size: 12px;
