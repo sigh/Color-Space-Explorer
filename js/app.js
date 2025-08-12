@@ -1,6 +1,6 @@
 import { CanvasRenderer } from './canvasRenderer.js';
 import { CanvasUI } from './canvasUI.js';
-import { UIController } from './uiController.js';
+import { ConfigurationController } from './configurationController.js';
 import { getAllColorSpaces, getAllDistanceMetrics, ColorSpaceView, getColorSpaceByType, getDefaultDistanceMetric, getDistanceMetricById } from './colorSpace.js';
 import { ColorPalette } from './colorPalette.js';
 import { ColorDisplay } from './colorDisplay.js';
@@ -33,7 +33,7 @@ class ColorSpaceExplorer {
     // Try to load state from URL, otherwise use defaults
     const initialColorSpaceView = URLStateManager.deserializeColorSpaceViewFromURL();
 
-    this._uiController = new UIController(
+    this._configurationController = new ConfigurationController(
       document.querySelector('.control-panel'),
       initialColorSpaceView,
       this._deferredUpdateRenderer.bind(this));
@@ -58,7 +58,7 @@ class ColorSpaceExplorer {
 
   _updateRenderer(options) {
     if (!this._renderer) return;
-    const colorSpaceView = this._uiController.getCurrentColorSpaceView();
+    const colorSpaceView = this._configurationController.getCurrentColorSpaceView();
     const paletteColors = this._colorPalette.getColors();
 
     // Pass rotation matrix for 3D renderer

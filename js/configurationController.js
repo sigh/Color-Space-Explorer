@@ -2,9 +2,9 @@ import { clearElement, createElement } from './utils.js';
 import { ColorSpaceView, getAllColorSpaces, getAllDistanceMetrics, getDistanceMetricById } from './colorSpace.js';
 
 /**
- * UI controller for handling axis controls and boundaries toggle
+ * Configuration controller for handling axis controls and boundaries toggle
  */
-export class UIController {
+export class ConfigurationController {
   constructor(container, initialColorSpaceView, onColorSpaceChange) {
     // Axis control elements
     this._axisSlider = container.querySelector('.axis-slider');
