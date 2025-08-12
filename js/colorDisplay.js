@@ -1,6 +1,6 @@
 import { rgbToHsl, rgbToHsv, rgbToCssString } from './colorUtils.js';
 import { clearElement, createTextNode } from './utils.js';
-import { createColorItem } from './colorPalette.js';
+import { createColorItem, populateColorItem } from './colorPalette.js';
 
 /**
  * Handles color information display including hovered color and closest palette color
@@ -20,8 +20,9 @@ export class ColorDisplay {
     this._titleElement = container.querySelector('.color-info-title');
 
     // Closest color display element within the container
-    this._closestColorContainer = container.querySelector('.closest-color-container');
-    this._setClosestColor(null);
+    this._closestColorElem = createColorItem();
+    container.querySelector('.closest-color-container').appendChild(
+      this._closestColorElem);
 
     // Set default state
     this.clearColors();
@@ -97,12 +98,7 @@ export class ColorDisplay {
    * @param {NamedColor|null} closestColor - The closest palette color or null if no palette
    */
   _setClosestColor(closestColor) {
-    // Always clear and rebuild the container content
-    clearElement(this._closestColorContainer);
-
-    // Create a color item using the shared utility (handles null gracefully)
-    const colorItem = createColorItem(closestColor);
-    this._closestColorContainer.appendChild(colorItem);
+    populateColorItem(this._closestColorElem, closestColor);
   }
 
   /**

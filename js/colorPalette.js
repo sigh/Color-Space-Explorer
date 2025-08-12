@@ -6,13 +6,11 @@ import { NamedColor, getPresetNames, getPreset } from './namedColor.js';
 export const MAX_PALETTE_COLORS = 200;
 
 /**
- * Create a color item element styled like palette colors
- * @param {NamedColor|null} color - The color to create an item for, or null for empty state
+ * Create a color item element with no populated color
  * @param {Function} onDelete - Callback function for delete button click
- * @param {Function} onNameEdit - Callback function for name edit (color, newName)
  * @returns {HTMLElement} The color item element
  */
-export function createColorItem(color, onDelete = null, onNameEdit = null) {
+export function createColorItem(onDelete = null) {
   const item = createElement('div');
   item.className = 'color-item';
 
@@ -21,36 +19,8 @@ export function createColorItem(color, onDelete = null, onNameEdit = null) {
   swatch.className = 'color-swatch';
   item.appendChild(swatch);
 
-  if (!color) {
-    return item;
-  }
-
-  // Valid color state
-
-  swatch.classList.add('has-color');
-  const cssColor = rgbToCssString(color.rgbColor);
-  swatch.style.backgroundColor = cssColor;
-
-  // Color info container
   const info = createElement('div');
   info.className = 'color-item-info';
-
-  const name = createElement('div');
-  name.className = 'color-name';
-  name.appendChild(createTextNode(color ? color.name : 'No Palette'));
-
-  // Make name editable if callback provided
-  if (onNameEdit) {
-    _setupNameEditing(name, color, onNameEdit);
-  }
-
-  const rgbValues = createElement('div');
-  rgbValues.className = 'color-values';
-  rgbValues.appendChild(createTextNode(color.rgbColor.toString()));
-
-  info.appendChild(name);
-  info.appendChild(rgbValues);
-
   item.appendChild(info);
 
   // Add delete button if callback provided
@@ -67,6 +37,46 @@ export function createColorItem(color, onDelete = null, onNameEdit = null) {
   }
 
   return item;
+}
+
+/**
+ * Populate a color item with color data and event handlers
+ * @param {HTMLElement} item - The color item element to populate
+ * @param {NamedColor|null} color - The color to create an item for, or null for empty state
+ * @param {Function} onNameEdit - Callback function for name edit (color, newName)
+ */
+export function populateColorItem(item, color, onNameEdit = null) {
+  const swatch = item.querySelector('.color-swatch');
+  const info = item.querySelector('.color-item-info');
+  clearElement(info);
+
+  swatch.classList.toggle('has-color', !!color);
+
+  if (!color) {
+    swatch.style.removeProperty('background-color');
+    return;
+  }
+
+  // Valid color state
+
+  const cssColor = rgbToCssString(color.rgbColor);
+  swatch.style.backgroundColor = cssColor;
+
+  const name = createElement('div');
+  name.className = 'color-name';
+  name.appendChild(createTextNode(color ? color.name : 'No Palette'));
+
+  // Make name editable if callback provided
+  if (onNameEdit) {
+    _setupNameEditing(name, color, onNameEdit);
+  }
+
+  const rgbValues = createElement('div');
+  rgbValues.className = 'color-values';
+  rgbValues.appendChild(createTextNode(color.rgbColor.toString()));
+
+  info.appendChild(name);
+  info.appendChild(rgbValues);
 }
 
 function _setupNameEditing(nameElement, color, onNameEdit) {
@@ -256,11 +266,8 @@ export class ColorPalette {
     // Render each color
     for (let i = 0; i < this._colors.length; i++) {
       const color = this._colors[i];
-      const colorItem = createColorItem(
-        color,
-        this._deleteColor.bind(this),
-        this._editColorName.bind(this)
-      );
+      const colorItem = createColorItem(this._deleteColor.bind(this));
+      populateColorItem(colorItem, color, this._editColorName.bind(this));
 
       // Add hover event listeners for highlighting
       colorItem.addEventListener('mouseenter', () => {
