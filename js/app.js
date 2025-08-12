@@ -15,7 +15,7 @@ class ColorSpaceExplorer {
       this._updateRenderer.bind(this));
 
     // Initialize 3D mode state from URL
-    this._use3D = new URLSearchParams(window.location.search).has('3d');
+    this._render3d = new URLSearchParams(window.location.search).has('3d');
 
     const colorDisplayContainer = document.querySelector('.color-display-section');
     this._colorDisplay = new ColorDisplay(colorDisplayContainer);
@@ -32,6 +32,9 @@ class ColorSpaceExplorer {
 
     // Try to load state from URL, otherwise use defaults
     const initialColorSpaceConfig = URLStateManager.deserializeColorSpaceConfigFromURL();
+
+    // Initialize 3D mode state from the config
+    this._render3d = initialColorSpaceConfig.render3d;
 
     this._configController = new ConfigurationController(
       document.querySelector('.control-panel'),
@@ -51,7 +54,7 @@ class ColorSpaceExplorer {
       this._colorPalette,
       URLStateManager,
       this._deferredUpdateRenderer);
-    this._canvasUI.setUse3D(this._use3D);
+    this._canvasUI.setRender3d3d(this._render3d);
 
     this._updateRenderer(); // No deferral
   }
@@ -61,8 +64,14 @@ class ColorSpaceExplorer {
     const colorSpaceConfig = this._configController.getCurrentColorSpaceConfig();
     const paletteColors = this._colorPalette.getColors();
 
+    // Update 3D state from config
+    if (this._render3d !== colorSpaceConfig.render3d) {
+      this._render3d = colorSpaceConfig.render3d;
+      this._canvasUI.setRender3d3d(this._render3d);
+    }
+
     // Pass rotation matrix for 3D renderer
-    if (this._use3D) {
+    if (this._render3d) {
       this._renderer.render3DColorSpace(
         colorSpaceConfig,
         paletteColors,
@@ -82,21 +91,6 @@ class ColorSpaceExplorer {
 
     this._canvasUI.recalculateSelection();
   }
-
-  /**
-   * Toggle between 3D and 2D rendering modes
-   * @param {boolean} use3D - Whether to use 3D mode
-   */
-  async toggle3DMode(use3D) {
-    if (this._use3D === use3D) return; // No change needed
-
-    this._use3D = use3D;
-
-    // Update canvas UI for new mode
-    this._canvasUI.setUse3D(this._use3D);
-
-    this._updateRenderer();
-  }
 }
 
 /**
@@ -110,17 +104,22 @@ class URLStateManager {
   static serializeColorSpaceConfigToURL(colorSpaceConfig) {
     const params = new URLSearchParams();
     params.set('space', colorSpaceConfig.colorSpace.getType());
-    params.set(colorSpaceConfig.currentAxis.key, colorSpaceConfig.currentValue.toString());
+
+    // Only serialize 2D config if in 2D mode
+    if (!colorSpaceConfig.render3d && colorSpaceConfig.config2d) {
+      params.set(colorSpaceConfig.config2d.currentAxis.key, colorSpaceConfig.config2d.currentValue.toString());
+    }
+
     const distanceMetric = colorSpaceConfig.distanceMetric;
     params.set(
       distanceMetric.id,
       distanceMetric.thresholdToString(colorSpaceConfig.distanceThreshold));
 
     const regionsParam = colorSpaceConfig.showBoundaries ? '' : '&noregions';
-    const polarParam = colorSpaceConfig.usePolarCoordinates ? '&polar' : '';
+    const polarParam = (!colorSpaceConfig.render3d && colorSpaceConfig.config2d?.usePolarCoordinates) ? '&polar' : '';
 
-    // Preserve the 3d parameter if it exists
-    const current3dParam = new URLSearchParams(window.location.search).has('3d') ? '&3d' : '';
+    // Include 3D parameter if enabled
+    const current3dParam = colorSpaceConfig.render3d ? '&3d' : '';
 
     const fragment = window.location.hash;
     const newURL = `${window.location.pathname}?${params.toString()}${regionsParam}${polarParam}${current3dParam}${fragment}`;
@@ -194,6 +193,7 @@ class URLStateManager {
 
     const showBoundaries = !params.has('noregions');
     const usePolarCoordinates = params.has('polar');
+    const render3d = params.has('3d');
 
     // Look for distance metric and threshold in URL parameters
     let distanceMetric = getDefaultDistanceMetric();
@@ -210,7 +210,14 @@ class URLStateManager {
       }
     }
 
-    return new ColorSpaceConfig(colorSpace, axis, value, showBoundaries, usePolarCoordinates, distanceMetric, threshold);
+    // Create config2d only if in 2D mode
+    const config2d = render3d ? null : {
+      currentAxis: axis,
+      currentValue: value,
+      usePolarCoordinates: usePolarCoordinates
+    };
+
+    return new ColorSpaceConfig(colorSpace, render3d, config2d, showBoundaries, distanceMetric, threshold);
   }
 }
 

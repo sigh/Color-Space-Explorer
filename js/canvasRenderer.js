@@ -388,6 +388,8 @@ export class CanvasRenderer {
 
     // Second phase: Display framebuffer texture to canvas
     this._renderToCanvas(colorSpaceConfig.showBoundaries, highlightPaletteIndex);
+
+    clearElement(this._axisContainer);
   }
 
   /**

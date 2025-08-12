@@ -13,11 +13,14 @@ export class CanvasUI {
     this._colorPalette = colorPalette;
     this._urlStateManager = urlStateManager;
     this._onRotationChange = onRotationChange;
-    this._use3D = false;
+    this._render3d = false;
     this._selectionIndicator = null;
 
     // 3D rotation matrix for cube renderer
+    // Initialize with white corner tilted towards camera
     this._rotationMatrix = mat4.create();
+    mat4.fromXRotation(this._rotationMatrix, 30 * (Math.PI / 180)); // tilt 30° towards camera
+    mat4.rotateY(this._rotationMatrix, this._rotationMatrix, -30 * (Math.PI / 180));
 
     this._setupMouseHandlers(canvasPanel);
     this._initializeSelectionFromURL();
@@ -32,7 +35,7 @@ export class CanvasUI {
     let lastMouseY = 0;
 
     const setCursor = (isOverColor) => {
-      if (isDragging && this._use3D) return;
+      if (isDragging && this._render3d) return;
       canvasPanel.style.cursor = isOverColor ? 'crosshair' : 'default';
     }
 
@@ -41,7 +44,7 @@ export class CanvasUI {
       lastMouseX = event.clientX;
       lastMouseY = event.clientY;
 
-      if (this._use3D) {
+      if (this._render3d) {
         event.stopPropagation();
       }
     };
@@ -71,7 +74,7 @@ export class CanvasUI {
     const mouseMoveHandler = (event) => {
       // Handle 3D rotation if dragging
       if (isDragging) {
-        if (this._use3D) {
+        if (this._render3d) {
           canvasPanel.style.cursor = 'grab';
           mouseDragHandler(event);
         }
@@ -104,7 +107,7 @@ export class CanvasUI {
 
     const mouseUpHandler = (event) => {
       isDragging = false;
-      if (this._use3D) {
+      if (this._render3d) {
         const [x, y] = this._getCanvasCoordsFromMouseEvent(event);
         const [rgbColor] = this._renderer.getColorAt(x, y);
         setCursor(rgbColor !== null);
@@ -122,7 +125,7 @@ export class CanvasUI {
 
     // Click handler - only active in 2D mode
     const clickHandler = (event) => {
-      if (this._use3D) return; // No click handling in 3D mode
+      if (this._render3d) return; // No click handling in 3D mode
 
       const selectionClicked = event.target === this._selectionIndicator;
       const [x, y] = this._getCanvasCoordsFromMouseEvent(event);
@@ -163,10 +166,10 @@ export class CanvasUI {
 
   /**
    * Update mode (for toggling between 2D/3D)
-   * @param {boolean} use3D - Whether using 3D mode
+   * @param {boolean} render3d - Whether using 3D mode
    */
-  setUse3D(use3D) {
-    this._use3D = use3D;
+  setRender3d3d(render3d) {
+    this._render3d = render3d;
     this._clearSelection();
   }
 

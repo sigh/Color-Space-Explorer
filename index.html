@@ -13,18 +13,30 @@
     <!-- Left Panel - Controls -->
     <div class="control-panel">
       <div class="panel-section">
+        <h2>Render Mode</h2>
+        <div class="control-group">
+          <div class="render-mode-selector segmented-control">
+            <label class="radio-button">
+              <input type="radio" name="render-mode" value="2d" checked>
+              <span>2D</span>
+            </label>
+            <label class="radio-button">
+              <input type="radio" name="render-mode" value="3d">
+              <span>3D</span>
+            </label>
+          </div>
+        </div>
         <h2>Color Space</h2>
         <div class="control-group">
-          <label class="control-label">Color Space Type</label>
           <div class="button-group color-space-selector segmented-control">
           </div>
         </div>
-        <div class="control-group">
+        <div class="control-group only-2d">
           <label class="control-label">Fixed Axis</label>
           <div class="axis-selector segmented-control">
           </div>
         </div>
-        <div class="control-group">
+        <div class="control-group only-2d">
           <label for="axisSlider" class="control-label">
             <span class="axis-label">Hue</span>
           </label>
@@ -34,15 +46,15 @@
           </div>
         </div>
 
-        <div class="control-group" style="visibility: hidden;">
+        <div class="control-group only-2d" style="visibility: hidden;">
           <label class="control-label polar-toggle-group">
             <input type="checkbox" class="polar-toggle toggle-checkbox">
             <span class="toggle-label">Polar Coordinates</span>
           </label>
         </div>
 
+        <h2>Distance Metric</h2>
         <div class="control-group">
-          <label class="control-label">Distance Metric</label>
           <select class="distance-metric-dropdown dropdown-control">
           </select>
         </div>
