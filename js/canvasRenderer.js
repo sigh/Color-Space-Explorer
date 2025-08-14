@@ -70,6 +70,33 @@ export class CanvasRenderer {
   }
 
   /**
+   * Create a rotation matrix to orient a cube face toward the camera for 2D rendering
+   * @param {ColorSpaceConfig} colorSpaceConfig - The color space configuration
+   * @returns {mat4} Rotation matrix to orient the specified face toward the camera
+   */
+  _createFaceRotationMatrix(colorSpaceConfig) {
+    const colorSpace = colorSpaceConfig.colorSpace;
+    const currentAxisIndex = colorSpace.getAxisIndex(colorSpaceConfig.currentAxis);
+
+    const rotationMatrix = mat4.create();
+
+    // Based on which axis is fixed, rotate to face that axis toward the camera
+    switch (currentAxisIndex) {
+      case 0: // X-axis fixed. y points left, z points up.
+        {
+          mat4.fromZRotation(rotationMatrix, -Math.PI / 2);
+          return mat4.rotateY(rotationMatrix, rotationMatrix, -Math.PI / 2);
+        }
+
+      case 1: // Y-axis fixed. x points left, x points up
+        return mat4.fromXRotation(rotationMatrix, -Math.PI / 2);
+
+      case 2: // Z-axis fixed - x points left, y points up
+        return rotationMatrix;
+    }
+  }
+
+  /**
    * Factory function to create a CanvasRenderer with shader loading
    * @param {HTMLCanvasElement} canvasContainer - The container for the canvas element
    * @returns {Promise<CanvasRenderer>} - Promise that resolves to initialized renderer
@@ -214,8 +241,7 @@ export class CanvasRenderer {
     const size = 1.1; // Cube size for better visibility
 
     // Generate all 8 corners of the cube with RGB color coordinates
-    // Color axis order [0,1,2] means x->R, y->G, z->B
-    const corners = CubeGeometryHelper.generateCubeCorners(size, [0, 1, 2]);
+    const corners = CubeGeometryHelper.generateCubeCorners(size);
 
     // Generate faces programmatically - each face shares one coordinate
     const vertices = [];
@@ -258,19 +284,12 @@ export class CanvasRenderer {
     const currentAxisIndex = colorSpace.getAxisIndex(colorSpaceConfig.currentAxis);
     const fixedValue = colorSpaceConfig.currentValue / colorSpaceConfig.currentAxis.max; // Normalized to [0,1]
 
-    // Create color axis mapping where:
-    // - X position maps to first variable axis
-    // - Y position maps to second variable axis
-    // - Z position maps to fixed axis (will be set to fixedValue)
-    const colorAxisOrder = [0, 1, 2]
-      .filter(axis => axis !== currentAxisIndex);
-    colorAxisOrder.push(currentAxisIndex);
+    // Generate cube corners
+    const allCorners = CubeGeometryHelper.generateCubeCorners(size);
 
-    // Generate cube corners with the mapped axis order
-    const allCorners = CubeGeometryHelper.generateCubeCorners(size, colorAxisOrder);
-
-    // Filter to get the 4 corners with the same z value.
-    const faceCorners = CubeGeometryHelper.filterCornersByFace(allCorners, 2, 1);
+    // Get the face that corresponds to the fixed axis
+    // Direction 1 means the positive face of the axis
+    const faceCorners = CubeGeometryHelper.filterCornersByFace(allCorners, currentAxisIndex, 1);
 
     // Adjust the color coordinates for the fixed axis to the exact value
     const adjustedCorners = faceCorners.map(corner => {
@@ -278,7 +297,7 @@ export class CanvasRenderer {
       // Set exact fixed value in original color space
       adjustedCorner[3 + currentAxisIndex] = fixedValue;
       // Position Z to 0 for 2D face
-      adjustedCorner[2] = 0.0;
+      adjustedCorner[currentAxisIndex] = 0.0;
       return adjustedCorner;
     });
 
@@ -356,8 +375,11 @@ export class CanvasRenderer {
     const { vertices, indices } = this._generateFaceGeometry(colorSpaceConfig);
     this._createGeometry(vertices, indices);
 
+    // Generate rotation matrix to orient the face toward the camera
+    const rotationMatrix = this._createFaceRotationMatrix(colorSpaceConfig);
+
     // First phase: Render 3D face to framebuffer for color computation
-    this._renderToFramebuffer(colorSpaceConfig, paletteColors);
+    this._renderToFramebuffer(colorSpaceConfig, paletteColors, rotationMatrix);
 
     // Second phase: Display framebuffer texture to canvas
     this._renderToCanvas(colorSpaceConfig.showBoundaries, highlightPaletteIndex);
@@ -698,10 +720,9 @@ class CubeGeometryHelper {
   /**
    * Generate all 8 corners of a cube using bit patterns
    * @param {number} size - Size of the cube
-   * @param {Array<number>} colorAxisOrder - Array of 3 indices mapping [x,y,z] positions to color coordinates [0,1,2]
    * @returns {Array} Array of 8 corners, each with [x, y, z, colorCoord0, colorCoord1, colorCoord2]
    */
-  static generateCubeCorners(size, colorAxisOrder = [0, 1, 2]) {
+  static generateCubeCorners(size) {
     const half = size / 2;
     const corners = [];
 
@@ -714,14 +735,9 @@ class CubeGeometryHelper {
       const y = yBit ? half : -half;
       const z = zBit ? half : -half;
 
-      // Color coordinates based on axis order mapping
-      const colorCoord = [0, 0, 0];
-      colorCoord[colorAxisOrder[0]] = xBit;
-      colorCoord[colorAxisOrder[1]] = yBit;
-      colorCoord[colorAxisOrder[2]] = zBit;
-
-      corners.push([x, y, z, ...colorCoord]);
+      corners.push([x, y, z, xBit, yBit, zBit]);
     }
+
     return corners;
   }
 
