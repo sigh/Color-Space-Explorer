@@ -3,8 +3,7 @@ precision mediump float;
 in vec3 v_colorCoord;
 out vec4 fragColor;
 uniform int u_colorSpaceIndex; // 0=RGB, 1=HSV, 2=HSL
-uniform ivec2 u_variableAxes; // The two variable axis indices (e.g. [1,2] if axis 0 is fixed)
-uniform int u_polarAngleAxis; // Index of axis to convert to angle (-1 = no polar coordinates)
+uniform ivec2 u_polarAxes; // [rAxisIndex, thetaAxisIndex] or [-1, -1] if not polar
 uniform int u_distanceMetric; // 0=Delta E (LAB), 1=RGB Euclidean
 uniform float u_distanceThreshold; // Maximum distance for color matching
 
@@ -168,9 +167,9 @@ void main() {
   vec3 colorCoord = v_colorCoord;
 
   // Apply polar coordinate transformation if enabled
-  if (u_polarAngleAxis >= 0) {
-    // Extract the two variable axes directly
-    vec2 texCoord = vec2(colorCoord[u_variableAxes.x], colorCoord[u_variableAxes.y]);
+  if (u_polarAxes.x >= 0) {
+    // Extract the two polar axes
+    vec2 texCoord = vec2(colorCoord[u_polarAxes.x], colorCoord[u_polarAxes.y]);
 
     vec2 polarCoord = cartesianToPolar(texCoord);
 
@@ -180,14 +179,9 @@ void main() {
       return;
     }
 
-    // Determine which variable axis gets radius vs angle
-    if (u_polarAngleAxis == u_variableAxes.x) {
-      polarCoord = polarCoord.yx; // Swap to match variable axes order
-    }
-
-    // First variable axis is angle, second is radius
-    colorCoord[u_variableAxes.x] = polarCoord.x;
-    colorCoord[u_variableAxes.y] = polarCoord.y;
+    // Map polar coordinates: r -> rAxisIndex, theta -> thetaAxisIndex
+    colorCoord[u_polarAxes.x] = polarCoord.x; // radius
+    colorCoord[u_polarAxes.y] = polarCoord.y; // angle (theta)
   }
 
   vec3 color;

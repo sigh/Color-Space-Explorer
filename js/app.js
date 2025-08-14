@@ -105,9 +105,19 @@ class URLStateManager {
     const params = new URLSearchParams();
     params.set('space', colorSpaceConfig.colorSpace.getType());
 
-    // Only serialize 2D config if in 2D mode
-    if (!colorSpaceConfig.render3d && colorSpaceConfig.config2d) {
-      params.set(colorSpaceConfig.config2d.currentAxis.key, colorSpaceConfig.config2d.currentValue.toString());
+    if (colorSpaceConfig.render3d) {
+      for (const [axis, range] of colorSpaceConfig.axisSlices) {
+        // 3D: Only include if not the full range
+        if (range[0] !== axis.min || range[1] !== axis.max) {
+          params.set(axis.key, `${range[0]}-${range[1]}`);
+        }
+      }
+    } else {
+      for (const [axis, range] of colorSpaceConfig.axisSlices) {
+        // 2D: Take the first range value and stop.
+        params.set(axis.key, `${range[0]}`);
+        break;
+      }
     }
 
     const distanceMetric = colorSpaceConfig.distanceMetric;
@@ -175,25 +185,36 @@ class URLStateManager {
     const spaceParam = params.get('space')?.toUpperCase();
     const colorSpace = getColorSpaceByType(spaceParam) || getAllColorSpaces()[0];
 
-    // Try to find axis and value by looking for axis keys in the URL parameters
-    // Set defaults to use if we can't find valid parameters
-    let axis = colorSpace.getDefaultAxis();
-    let value = axis.defaultValue;
+    const axisSlices = new Map();
+    for (const axis of colorSpace.getAllAxes()) {
+      const axisValue = params.get(axis.key);
+      if (axisValue === null) continue;
 
-    for (const availableAxis of colorSpace.getAllAxes()) {
-      const axisValue = params.get(availableAxis.key);
-      if (axisValue !== null) {
-        axis = availableAxis;
-        const valueIsInteger = axisValue.match(/^-?\d+$/);
-        value = valueIsInteger && axis.isValidValue(Number(axisValue))
-          ? Number(axisValue) : axis.defaultValue;
-        break;
+      // Check if it's a range (contains dash) or single value
+      if (axisValue.includes('-')) {
+        const [min, max] = axisValue.split('-').map(Number);
+        if (axis.isValidValue(min) && axis.isValidValue(max)) {
+          axisSlices.set(axis, [min, max]);
+        }
+      } else {
+        // Single value
+        const value = Number(axisValue);
+        if (axis.isValidValue(value)) {
+          axisSlices.set(axis, [value, value]);
+        }
       }
+    }
+
+    const render3d = params.has('3d');
+
+    if (!render3d && axisSlices.length === 0) {
+      // Set defaults to use if we can't find valid parameters
+      let axis = colorSpace.getDefaultAxis();
+      axisSlices.set(axis, [axis.defaultValue, axis.defaultValue]);
     }
 
     const showBoundaries = !params.has('noregions');
     const usePolarCoordinates = params.has('polar');
-    const render3d = params.has('3d');
 
     // Look for distance metric and threshold in URL parameters
     let distanceMetric = getDefaultDistanceMetric();
@@ -212,12 +233,10 @@ class URLStateManager {
 
     // Create config2d only if in 2D mode
     const config2d = render3d ? null : {
-      currentAxis: axis,
-      currentValue: value,
       usePolarCoordinates: usePolarCoordinates
     };
 
-    return new ColorSpaceConfig(colorSpace, render3d, config2d, showBoundaries, distanceMetric, threshold);
+    return new ColorSpaceConfig(colorSpace, axisSlices, render3d, config2d, showBoundaries, distanceMetric, threshold);
   }
 }
 

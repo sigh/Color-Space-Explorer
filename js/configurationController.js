@@ -8,6 +8,7 @@ import { RangeSlider } from './rangeSlider.js';
 export class ColorSpaceConfig {
   constructor(
     colorSpace,
+    axisSlices,
     render3d = false,
     config2d = null,
     showBoundaries = true,
@@ -15,12 +16,11 @@ export class ColorSpaceConfig {
     distanceThreshold = null) {
 
     this.colorSpace = colorSpace;
+    this.axisSlices = axisSlices;
     this.render3d = render3d;
     this.config2d = null;
     if (!this.render3d) {
       this.config2d = {
-        currentAxis: colorSpace.getDefaultAxis(),
-        currentValue: colorSpace.getDefaultAxis().defaultValue,
         usePolarCoordinates: false
       };
       Object.assign(this.config2d, config2d || {});
@@ -37,11 +37,15 @@ export class ColorSpaceConfig {
 
   // Backward compatibility getters for 2D renderer
   get currentAxis() {
-    return this.config2d?.currentAxis || this.colorSpace.getDefaultAxis();
+    for (const key of this.axisSlices.keys()) {
+      return key;
+    }
   }
 
   get currentValue() {
-    return this.config2d?.currentValue;
+    for (const values of this.axisSlices.values()) {
+      return values[0];
+    }
   }
 
   get usePolarCoordinates() {
@@ -159,10 +163,15 @@ export class ConfigurationController {
 
     this._setupColorSpaceButtons(container, initialColorSpaceConfig.colorSpace);
     this._selectColorSpace(
-      initialColorSpaceConfig.colorSpace, initialColorSpaceConfig.config2d?.currentAxis);
+      initialColorSpaceConfig.colorSpace, initialColorSpaceConfig.currentAxis);
 
     if (!this._render3d) {
-      this._axisSlider2d.setValue(initialColorSpaceConfig.config2d.currentValue);
+      this._axisSlider2d.setValue(initialColorSpaceConfig.currentValue);
+    } else {
+      for (const [axis, range] of initialColorSpaceConfig.axisSlices.entries()) {
+        const axisIndex = this._colorSpace.getAxisIndex(axis);
+        this._axisSliders3d[axisIndex].setValues(range);
+      }
     }
   }
 
@@ -222,7 +231,7 @@ export class ConfigurationController {
 
       // Attach event listener directly
       radio.addEventListener('change', () => {
-        this._selectColorSpace(cs);
+        this._selectColorSpace(cs, cs.getDefaultAxis());
       });
     });
   }
@@ -317,7 +326,7 @@ export class ConfigurationController {
   /**
    * Select a new color space type
    * @param {ColorSpace} colorSpace - Color space to select
-   * @param {Axis} [axis] - Optional axis to select, defaults to the color space's default axis
+   * @param {Axis} axis - Axis for the color space
    */
   _selectColorSpace(colorSpace, axis) {
     // Update color space
@@ -372,15 +381,25 @@ export class ConfigurationController {
     const metric = getDistanceMetricById(this._distanceMetricDropdown.value);
     const threshold = fromLogThreshold(metric, this._distanceThresholdSlider.getValue());
 
+    const axisSlices = new Map();
+    if (this._render3d) {
+      const allAxes = this._colorSpace.getAllAxes();
+      for (let i = 0; i < allAxes.length; i++) {
+        axisSlices.set(allAxes[i], this._axisSliders3d[i].getValues());
+      }
+    } else {
+      const value = this._axisSlider2d.getValue();
+      axisSlices.set(this._currentAxis, [value, value]);
+    }
+
     // Only collect 2D config if in 2D mode
     const config2d = this._render3d ? null : {
-      currentAxis: this._currentAxis,
-      currentValue: parseInt(this._axisSlider2d.getValue()),
       usePolarCoordinates: this._polarToggle.checked && this._colorSpace.availablePolarAxis(this._currentAxis)
     };
 
     return new ColorSpaceConfig(
       this._colorSpace,
+      axisSlices,
       this._render3d,
       config2d,
       this._boundariesToggle.checked,

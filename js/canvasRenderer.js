@@ -4,6 +4,7 @@ import { MAX_PALETTE_COLORS } from "./colorPalette.js";
 
 // Import gl-matrix for efficient matrix operations
 import '../lib/gl-matrix-min.js';
+import { ColorSpaceConfig } from "./configurationController.js";
 const { mat4 } = glMatrix;
 
 const OUTSIDE_COLOR_SPACE = 255;
@@ -140,8 +141,7 @@ export class CanvasRenderer {
       positionLocation: gl.getAttribLocation(computeProgram, 'a_position'),
       colorCoordLocation: gl.getAttribLocation(computeProgram, 'a_colorCoord'),
       modelViewProjectionLocation: gl.getUniformLocation(computeProgram, 'u_modelViewProjection'),
-      variableAxesLocation: gl.getUniformLocation(computeProgram, 'u_variableAxes'),
-      polarAngleAxisLocation: gl.getUniformLocation(computeProgram, 'u_polarAngleAxis'),
+      polarAxesLocation: gl.getUniformLocation(computeProgram, 'u_polarAxes'),
       colorSpaceIndexLocation: gl.getUniformLocation(computeProgram, 'u_colorSpaceIndex'),
       paletteColorsLocation: gl.getUniformLocation(computeProgram, 'u_paletteColors'),
       paletteCountLocation: gl.getUniformLocation(computeProgram, 'u_paletteCount'),
@@ -235,13 +235,14 @@ export class CanvasRenderer {
 
   /**
    * Generate 3D cube geometry data programmatically (same logic as CubeRenderer)
+   * @param {Array} normalizedSlices - Normalized axis slices as [min, max] pairs
    * @returns {Object} Object with vertices and indices arrays
    */
-  _generate3DCubeGeometry() {
+  _generate3DCubeGeometry(normalizedSlices) {
     const size = 1.1; // Cube size for better visibility
 
     // Generate all 8 corners of the cube with RGB color coordinates
-    const corners = CubeGeometryHelper.generateCubeCorners(size);
+    const corners = CubeGeometryHelper.generateCubeCorners(size, normalizedSlices);
 
     // Generate faces programmatically - each face shares one coordinate
     const vertices = [];
@@ -282,27 +283,26 @@ export class CanvasRenderer {
     // Generate face based on the color space configuration using cube renderer techniques
     const colorSpace = colorSpaceConfig.colorSpace;
     const currentAxisIndex = colorSpace.getAxisIndex(colorSpaceConfig.currentAxis);
-    const fixedValue = colorSpaceConfig.currentValue / colorSpaceConfig.currentAxis.max; // Normalized to [0,1]
+
+    const normalizedAxisSlices = this._normalizedAxisSlices(
+      colorSpace, colorSpaceConfig.axisSlices);
 
     // Generate cube corners
-    const allCorners = CubeGeometryHelper.generateCubeCorners(size);
+    const allCorners = CubeGeometryHelper.generateCubeCorners(
+      size, normalizedAxisSlices);
 
     // Get the face that corresponds to the fixed axis
     // Direction 1 means the positive face of the axis
-    const faceCorners = CubeGeometryHelper.filterCornersByFace(allCorners, currentAxisIndex, 1);
+    const faceCorners = CubeGeometryHelper.filterCornersByFace(
+      allCorners, currentAxisIndex, 1);
 
-    // Adjust the color coordinates for the fixed axis to the exact value
-    const adjustedCorners = faceCorners.map(corner => {
-      const adjustedCorner = [...corner];
-      // Set exact fixed value in original color space
-      adjustedCorner[3 + currentAxisIndex] = fixedValue;
-      // Position Z to 0 for 2D face
-      adjustedCorner[currentAxisIndex] = 0.0;
-      return adjustedCorner;
-    });
+    // Position Z to 0 for 2D face
+    for (const corner of faceCorners) {
+      corner[currentAxisIndex] = 0.0;
+    }
 
     // Create vertices array from corners and simple indices for single face
-    const vertices = new Float32Array(adjustedCorners.flat());
+    const vertices = new Float32Array(faceCorners.flat());
     const indices = new Uint16Array(CubeGeometryHelper.generateFaceIndexes(0));
 
     return { vertices, indices };
@@ -401,8 +401,9 @@ export class CanvasRenderer {
     // Store palette colors for consistency with indices
     this._paletteColors = [...paletteColors];
 
-    // Create 3D cube geometry
-    const { vertices, indices } = this._generate3DCubeGeometry();
+    // Get normalized axis slices and create 3D cube geometry
+    const normalizedSlices = this._normalizedAxisSlices(colorSpaceConfig.colorSpace, colorSpaceConfig.axisSlices);
+    const { vertices, indices } = this._generate3DCubeGeometry(normalizedSlices);
     this._createGeometry(vertices, indices);
 
     // First phase: Render 3D cube to framebuffer for color computation
@@ -452,26 +453,10 @@ export class CanvasRenderer {
     gl.uniformMatrix4fv(
       this._compute.modelViewProjectionLocation, false, finalMvpMatrix);
 
-    // Set the polar axis uniform (if applicable)
-    const colorSpace = colorSpaceConfig.colorSpace;
-    const polarAxis = colorSpaceConfig.usePolarCoordinates && !rotationMatrix ?
-      colorSpaceConfig.colorSpace.availablePolarAxis(colorSpaceConfig.currentAxis) : null;
-    const polarAxisIndex = polarAxis ? colorSpace.getAxisIndex(polarAxis) : -1;
-    gl.uniform1i(this._compute.polarAngleAxisLocation, polarAxisIndex);
-
-    // Set variable axes (only relevant polar calculations)
-    {
-      const currentAxisIndex = colorSpace.getAxisIndex(colorSpaceConfig.currentAxis);
-
-      // Calculate the two variable axes (the ones that aren't fixed)
-      const variableAxes = [];
-      for (let i = 0; i < 3; i++) {
-        if (i !== currentAxisIndex) {
-          variableAxes.push(i);
-        }
-      }
-      gl.uniform2iv(this._compute.variableAxesLocation, variableAxes);
-    }
+    // Set polar axes uniform
+    gl.uniform2iv(
+      this._compute.polarAxesLocation,
+      this._makePolarAxesVariable(colorSpaceConfig));
 
     // Common uniforms for both modes
     gl.uniform1i(
@@ -503,6 +488,25 @@ export class CanvasRenderer {
 
     // Draw using unified geometry
     gl.drawElements(gl.TRIANGLES, this._geometry.indexCount, gl.UNSIGNED_SHORT, 0);
+  }
+
+  /**
+   * Create a variable for the polar axes based on the color space configuration
+   * @param {ColorSpaceConfig} colorSpaceConfig
+   * @returns {Array<number>} - Array containing the indices of the radial and polar axes
+   */
+  _makePolarAxesVariable(colorSpaceConfig) {
+    if (!colorSpaceConfig.usePolarCoordinates) return [-1, -1];
+    const colorSpace = colorSpaceConfig.colorSpace;
+    const currentAxis = colorSpaceConfig.currentAxis;
+    const polarAxis = colorSpace.availablePolarAxis(currentAxis);
+
+    const rAxis = colorSpace.getAllAxes().find(
+      axis => axis !== polarAxis && axis !== currentAxis);
+
+    if (!polarAxis || !rAxis) return [-1, -1];
+
+    return [colorSpace.getAxisIndex(rAxis), colorSpace.getAxisIndex(polarAxis)];
   }
 
   /**
@@ -663,6 +667,26 @@ export class CanvasRenderer {
   }
 
   /**
+   * Normalize axis slices to [0, 1] range and fill in missing axes
+   * @param {ColorSpace} colorSpace
+   * @param {Map} axisSlices
+   * @returns {Array} Array of normalized axis ranges
+   */
+  _normalizedAxisSlices(colorSpace, axisSlices) {
+    const normalizedAxes = [];
+    for (const axis of colorSpace.getAllAxes()) {
+      const range = axisSlices.get(axis) || [axis.min, axis.max];
+      const fullRange = axis.max - axis.min;
+      const normalizedRange = [
+        (range[0] - axis.min) / fullRange,
+        (range[1] - axis.min) / fullRange
+      ];
+      normalizedAxes.push(normalizedRange);
+    }
+    return normalizedAxes;
+  }
+
+  /**
    * Get color at canvas coordinates by reading from the framebuffer
    * @param {number} x - X coordinate
    * @param {number} y - Y coordinate
@@ -719,23 +743,25 @@ export class CanvasRenderer {
 class CubeGeometryHelper {
   /**
    * Generate all 8 corners of a cube using bit patterns
-   * @param {number} size - Size of the cube
+   * @param {number} size - Base size of the cube
+   * @param {Array} normalizedSlices - Array of normalized [min, max] ranges for each axis
    * @returns {Array} Array of 8 corners, each with [x, y, z, colorCoord0, colorCoord1, colorCoord2]
    */
-  static generateCubeCorners(size) {
-    const half = size / 2;
+  static generateCubeCorners(size, normalizedSlices) {
     const corners = [];
 
     // Generate 8 corners using 3-bit patterns: 000, 001, 010, 011, 100, 101, 110, 111
     for (let i = 0; i < 8; i++) {
-      const [xBit, yBit, zBit] = [i & 1, (i & 2) >> 1, (i & 4) >> 2];
+      const colorCoords = [
+        normalizedSlices[0][i & 1],         // x axis
+        normalizedSlices[1][(i & 2) >> 1],  // y axis
+        normalizedSlices[2][(i & 4) >> 2]   // z axis
+      ];
 
-      // Position coordinates
-      const x = xBit ? half : -half;
-      const y = yBit ? half : -half;
-      const z = zBit ? half : -half;
+      // Position coordinates - map color coord to cube position
+      const positions = colorCoords.map(coord => (coord - 0.5) * size);
 
-      corners.push([x, y, z, xBit, yBit, zBit]);
+      corners.push([...positions, ...colorCoords]);
     }
 
     return corners;
