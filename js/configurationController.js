@@ -6,7 +6,14 @@ import { RangeSlider } from './rangeSlider.js';
  * Immutable color space configuration - a simple container for current axis and value
  */
 export class ColorSpaceConfig {
-  constructor(colorSpace, render3d = false, config2d = null, showBoundaries = true, distanceMetric = null, distanceThreshold = null) {
+  constructor(
+    colorSpace,
+    render3d = false,
+    config2d = null,
+    showBoundaries = true,
+    distanceMetric = null,
+    distanceThreshold = null) {
+
     this.colorSpace = colorSpace;
     this.render3d = render3d;
     this.config2d = null;
@@ -48,9 +55,10 @@ export class ColorSpaceConfig {
 export class ConfigurationController {
   constructor(container, initialColorSpaceConfig, onColorSpaceChange) {
     // Axis control elements
-    this._axisLabel = container.querySelector('.axis-label');
+    this._axisLabel2d = container.querySelector('.axis-label');
     this._axisSelector = container.querySelector('.axis-selector');
     this._2dOnlyControls = container.querySelectorAll('.only-2d');
+    this._3dOnlyControls = container.querySelectorAll('.only-3d');
 
     this._render3d = initialColorSpaceConfig.render3d;
 
@@ -80,7 +88,7 @@ export class ConfigurationController {
     renderModeRadios.forEach(radio => {
       radio.addEventListener('change', (event) => {
         this._render3d = (event.target.value === '3d');
-        this._update2DControlsVisibility();
+        this._updateDimControlsVisibility();
         this._onColorViewUpdate();
       });
       radio.checked =
@@ -98,15 +106,18 @@ export class ConfigurationController {
     this._boundariesToggle.checked = initialColorSpaceConfig.showBoundaries;
 
     // Update visibility of 2D controls
-    this._update2DControlsVisibility();
+    this._updateDimControlsVisibility();
   }
 
   /**
-   * Update visibility of 2D-only controls based on render mode
+   * Update visibility of 2D-only and 3D-only controls based on render mode
    */
-  _update2DControlsVisibility() {
+  _updateDimControlsVisibility() {
     this._2dOnlyControls.forEach(control => {
       control.style.display = this._render3d ? 'none' : 'block';
+    });
+    this._3dOnlyControls.forEach(control => {
+      control.style.display = this._render3d ? 'block' : 'none';
     });
   }
 
@@ -116,18 +127,42 @@ export class ConfigurationController {
    * @param {HTMLElement} container - Container element for controls
    */
   _setupColorSpaceControls(container, initialColorSpaceConfig) {
-    const axisSlider2d = container.querySelector('.axis-value-controls-2d');
+    const axisSlider2d = container.querySelector('.axis-slider-2d');
 
-    this._axisRangeSlider = this._makeLabeledSlider(
+    this._axisSlider2d = this._makeLabeledSlider(
       axisSlider2d,
       (value) => `${value}${this._currentAxis.unit}`);
+
+
+    const axisSliderContainer3d = container.querySelector('.axis-sliders-3d');
+    this._axisSliders3d = [];
+    this._axisLabels3d = [];
+    for (let i = 0; i < 3; i++) {
+      const labelContainer = createElement('div');
+      labelContainer.className = 'control-label';
+      const label = createElement('span', 'hello');
+      labelContainer.appendChild(label);
+      this._axisLabels3d.push(label);
+      axisSliderContainer3d.appendChild(labelContainer);
+
+      const sliderDiv = createElement('div');
+      const slider = this._makeLabeledSlider(
+        sliderDiv,
+        (value) => {
+          const axis = this._colorSpace.getAllAxes()[i];
+          return `${value}${axis.unit}`;
+        },
+        2);
+      this._axisSliders3d.push(slider);
+      axisSliderContainer3d.appendChild(sliderDiv);
+    }
 
     this._setupColorSpaceButtons(container, initialColorSpaceConfig.colorSpace);
     this._selectColorSpace(
       initialColorSpaceConfig.colorSpace, initialColorSpaceConfig.config2d?.currentAxis);
 
     if (!this._render3d) {
-      this._axisRangeSlider.setValue(initialColorSpaceConfig.config2d.currentValue);
+      this._axisSlider2d.setValue(initialColorSpaceConfig.config2d.currentValue);
     }
   }
 
@@ -135,9 +170,10 @@ export class ConfigurationController {
    * Create a labeled slider
    * @param {HTMLElement} container
    * @param {function} toString - Function to convert slider value to string
+   * @param {number} [numThumbs=1] - Number of thumbs for the slider
    * @returns
    */
-  _makeLabeledSlider(container, toString) {
+  _makeLabeledSlider(container, toString, numThumbs = 1) {
     container.classList.add('slider-container');
 
     const axisValue = document.createElement('span');
@@ -145,8 +181,9 @@ export class ConfigurationController {
     const axisRangeSlider = new RangeSlider(
       container,
       {
-        onChange: (value) => {
-          axisValue.textContent = toString(value);
+        numThumbs,
+        onChange: (...values) => {
+          axisValue.textContent = values.map(toString).join('-');
           this._onColorViewUpdate();
         }
       });
@@ -243,7 +280,7 @@ export class ConfigurationController {
    * @param {ColorSpace} colorSpace - The currently selected color space
    * @param {Axis} initialAxis - The default axis for the color space
    */
-  _updateAxisButtons(colorSpace, initialAxis) {
+  _update2dAxisButtons(colorSpace, initialAxis) {
     clearElement(this._axisSelector); // Clear existing buttons
 
     const axes = colorSpace.getAllAxes();
@@ -289,7 +326,16 @@ export class ConfigurationController {
     axis ||= colorSpace.getDefaultAxis();
 
     // Update axis buttons for the new color space
-    this._updateAxisButtons(colorSpace, axis);
+    this._update2dAxisButtons(colorSpace, axis);
+
+    // Update 3d axis sliders and labels
+    const allAxes = colorSpace.getAllAxes();
+    for (let i = 0; i < allAxes.length; i++) {
+      const axis = allAxes[i];
+      this._axisLabels3d[i].textContent = axis.name;
+      this._axisSliders3d[i].setRange(axis.min, axis.max);
+      this._axisSliders3d[i].setValues([axis.min, axis.max]);
+    }
   }
 
   /**
@@ -299,9 +345,9 @@ export class ConfigurationController {
   _selectAxis(axis) {
     this._currentAxis = axis;
 
-    this._axisRangeSlider.setRange(axis.min, axis.max);
-    this._axisRangeSlider.setValue(axis.defaultValue);
-    this._axisLabel.textContent = axis.name;
+    this._axisSlider2d.setRange(axis.min, axis.max);
+    this._axisSlider2d.setValue(axis.defaultValue);
+    this._axisLabel2d.textContent = axis.name;
 
     // Update polar toggle visibility
     this._updatePolarToggleVisibility();
@@ -329,7 +375,7 @@ export class ConfigurationController {
     // Only collect 2D config if in 2D mode
     const config2d = this._render3d ? null : {
       currentAxis: this._currentAxis,
-      currentValue: parseInt(this._axisRangeSlider.getValue()),
+      currentValue: parseInt(this._axisSlider2d.getValue()),
       usePolarCoordinates: this._polarToggle.checked && this._colorSpace.availablePolarAxis(this._currentAxis)
     };
 

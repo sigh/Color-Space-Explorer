@@ -279,17 +279,11 @@ h3 {
   display: flex;
   align-items: center;
   gap: 12px;
+  margin-left: 4px;
 }
 
-.slider-container input {
-  flex: 1;
-  height: 6px;
-  border-radius: var(--radius-slider);
-  background: var(--bg-surface);
-  border: 1px solid var(--bg-surface-hover);
-  outline: none;
-  cursor: pointer;
-  appearance: none;
+.axis-sliders-3d .slider-container {
+  padding-bottom: 6px;
 }
 
 /* Range slider track container */
@@ -344,9 +338,8 @@ h3 {
 .slider-display-value {
   color: var(--text-secondary);
   font-family: var(--font-mono);
-  font-size: 12px;
-  min-width: 40px;
-  text-align: right;
+  font-size: 11px;
+  width: 55px;
 }
 
 /* Toggle styles */
