@@ -75,9 +75,21 @@ export class RangeSlider {
   _setupEventListeners() {
     let dragTarget = null;
 
-    const startDrag = (e, thumbIndex) => {
+    const startDrag = (e) => {
       e.preventDefault();
-      dragTarget = thumbIndex;
+
+      const x = e.clientX - this._container.getBoundingClientRect().left;
+      const value = this._positionToValue(x);
+
+      // Find the closest thumb to start dragging
+      const closestIndex = this._findClosestThumb(value);
+
+      // Move the closest thumb to the clicked position
+      this._values[closestIndex] = value;
+      dragTarget = closestIndex;
+
+      this._updatePositions();
+      this._options.onChange(...this._values);
     };
 
     const stopDrag = () => {
@@ -97,24 +109,7 @@ export class RangeSlider {
       this._options.onChange(...this._values);
     };
 
-    const handleTrackClick = (e) => {
-      if (dragTarget !== null) return;
-
-      const x = e.clientX - this._container.getBoundingClientRect().left;
-      const value = this._positionToValue(x);
-
-      // Find and move the closest thumb
-      const closestIndex = this._findClosestThumb(value);
-      this._values[closestIndex] = value;
-
-      this._updatePositions();
-      this._options.onChange(...this._values);
-    };
-
-    this._thumbs.forEach((thumb, index) => {
-      thumb.addEventListener('mousedown', (e) => startDrag(e, index));
-    });
-    this._container.addEventListener('click', handleTrackClick);
+    this._container.addEventListener('mousedown', startDrag);
     document.addEventListener('mousemove', handleMouseMove);
     document.addEventListener('mouseup', stopDrag);
   }
