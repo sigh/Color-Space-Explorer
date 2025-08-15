@@ -56,7 +56,7 @@ export class ColorSpaceConfig {
 /**
  * Configuration controller for handling axis controls and boundaries toggle
  */
-export class ConfigurationController {
+export class ConfigController {
   constructor(container, initialColorSpaceConfig, onColorSpaceChange) {
     // Axis control elements
     this._axisLabel2d = container.querySelector('.axis-label');

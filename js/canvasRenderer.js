@@ -4,7 +4,7 @@ import { MAX_PALETTE_COLORS } from "./colorPalette.js";
 
 // Import gl-matrix for efficient matrix operations
 import '../lib/gl-matrix-min.js';
-import { ColorSpaceConfig } from "./configurationController.js";
+import { ColorSpaceConfig } from "./configController.js";
 const { mat4 } = glMatrix;
 
 const OUTSIDE_COLOR_SPACE = 255;

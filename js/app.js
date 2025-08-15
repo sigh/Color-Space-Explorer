@@ -1,6 +1,6 @@
 import { CanvasRenderer } from './canvasRenderer.js';
 import { CanvasUI } from './canvasUI.js';
-import { ConfigurationController, ColorSpaceConfig } from './configurationController.js';
+import { ConfigController, ColorSpaceConfig } from './configController.js';
 import { getAllColorSpaces, getAllDistanceMetrics, getColorSpaceByType, getDefaultDistanceMetric, getDistanceMetricById } from './colorSpace.js';
 import { ColorPalette } from './colorPalette.js';
 import { ColorDisplay } from './colorDisplay.js';
@@ -36,7 +36,7 @@ class ColorSpaceExplorer {
     // Initialize 3D mode state from the config
     this._render3d = initialColorSpaceConfig.render3d;
 
-    this._configController = new ConfigurationController(
+    this._configController = new ConfigController(
       document.querySelector('.control-panel'),
       initialColorSpaceConfig,
       this._deferredUpdateRenderer.bind(this));
