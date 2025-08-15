@@ -270,6 +270,8 @@ export class DistanceMetric {
 const DISTANCE_METRICS = Object.freeze([
   // Delta E: typical values range from 0-100, with 1-5 being perceptually similar
   new DistanceMetric('lab-d', 'L*a*b* (Delta E)', 0.1, 100.0),
+  // L*u*v* Delta E: similar to L*a*b*, values range from 0-100, with 1-5 being perceptually similar
+  new DistanceMetric('luv-d', 'L*u*v* (Delta E)', 0.1, 100.0),
   // RGB Euclidean: values range from 0-√3 ≈ 1.732, with 0.1 being very similar
   new DistanceMetric('rgb-d', 'RGB (Euclidean)', 0.01, 1.0)
 ]);

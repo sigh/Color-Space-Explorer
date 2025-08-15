@@ -4,7 +4,7 @@ in vec3 v_colorCoord;
 out vec4 fragColor;
 uniform int u_colorSpaceIndex; // 0=RGB, 1=HSV, 2=HSL
 uniform ivec2 u_polarAxes; // [rAxisIndex, thetaAxisIndex] or [-1, -1] if not polar
-uniform int u_distanceMetric; // 0=Delta E (LAB), 1=RGB Euclidean
+uniform int u_distanceMetric; // 0=Delta E (LAB), 1=L*u*v* (Delta E), 2=RGB Euclidean
 uniform float u_distanceThreshold; // Maximum distance for color matching
 
 const int MAX_PALETTE_COLORS = 200;
@@ -80,24 +80,25 @@ vec3 rgbToXyz(vec3 rgb) {
   return rgbToXyzMatrix * linear;
 }
 
+const float CIE_EPSILON = 0.008856;  // epsilon = delta^3 where delta = 6/29
+const float CIE_KAPPA = 903.3; // kappa = 24389/27
+
+// D65 illuminant reference white point
+// See http://www.brucelindbloom.com/index.html?Eqn_ChromAdapt.html
+vec3 REFERENCE_WHITE = vec3(0.95047, 1.00000, 1.08883);
+
 // Convert XYZ to LAB color space
 vec3 xyzToLab(vec3 xyz) {
   // Reference: http://www.brucelindbloom.com/index.html?Eqn_XYZ_to_Lab.html
 
-  // D65 illuminant reference white point
-  // See http://www.brucelindbloom.com/index.html?Eqn_ChromAdapt.html
-  vec3 referenceWhite = vec3(0.95047, 1.00000, 1.08883);
-
   // Normalize by reference white
-  vec3 normalized = xyz / referenceWhite;
+  vec3 normalized = xyz / REFERENCE_WHITE;
 
   // Apply LAB transformation function
-  const float EPSILON = 0.008856;  // epsilon = delta^3 where delta = 6/29
-  const float KAPPA = 903.3; // kappa = 24389/27
   vec3 f = mix(
-    (KAPPA / 116.0) * normalized + vec3(16.0/116.0),
+    (CIE_KAPPA / 116.0) * normalized + vec3(16.0/116.0),
     pow(normalized, vec3(1.0/3.0)),
-    greaterThan(normalized, vec3(EPSILON))
+    greaterThan(normalized, vec3(CIE_EPSILON))
   );
 
   // Calculate LAB values
@@ -112,6 +113,40 @@ vec3 xyzToLab(vec3 xyz) {
 vec3 rgbToLab(vec3 rgb) {
   vec3 xyz = rgbToXyz(rgb);
   return xyzToLab(xyz);
+}
+
+// Convert XYZ to LUV color space
+vec3 xyzToLuv(vec3 xyz) {
+  // Reference: http://www.brucelindbloom.com/index.html?Eqn_XYZ_to_Luv.html
+
+  // Calculate Y ratio for L* calculation
+  float yr = xyz.y / REFERENCE_WHITE.y;
+
+  // Calculate L* using the same function as LAB
+  float L = yr > CIE_EPSILON ?  116.0 * pow(yr, 1.0/3.0) - 16.0 : CIE_KAPPA * yr;
+
+  // Calculate u' and v' for this color.
+  float denominator = dot(xyz, vec3(1.0, 15.0, 3.0));
+  denominator = max(denominator, 1e-5); // Avoid division by zero
+  float uprime = 4.0 * xyz.x / denominator;
+  float vprime = 9.0 * xyz.y / denominator;
+
+  // Calculate u'n and v'n for reference white
+  float referenceDenominator = dot(REFERENCE_WHITE, vec3(1.0, 15.0, 3.0));
+  float urPrime = 4.0 * REFERENCE_WHITE.x / referenceDenominator;
+  float vrPrime = 9.0 * REFERENCE_WHITE.y / referenceDenominator;
+
+  // Calculate u* and v*
+  float u = 13.0 * L * (uprime - urPrime);
+  float v = 13.0 * L * (vprime - vrPrime);
+
+  return vec3(L, u, v);
+}
+
+// Convert RGB to LUV color space
+vec3 rgbToLuv(vec3 rgb) {
+  vec3 xyz = rgbToXyz(rgb);
+  return xyzToLuv(xyz);
 }
 
 // Convert Cartesian coordinates to polar coordinates
@@ -149,6 +184,11 @@ int findClosestPaletteIndex(vec3 color) {
       vec3 labColor = rgbToLab(color);
       vec3 labPaletteColor = rgbToLab(u_paletteColors[i]);
       d2 = distance2(labColor, labPaletteColor);
+    } else if (u_distanceMetric == 1) {
+      // Delta E (LUV) distance
+      vec3 luvColor = rgbToLuv(color);
+      vec3 luvPaletteColor = rgbToLuv(u_paletteColors[i]);
+      d2 = distance2(luvColor, luvPaletteColor);
     } else {
       // RGB Euclidean distance
       d2 = distance2(color, u_paletteColors[i]);
