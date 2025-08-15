@@ -7,10 +7,9 @@ export const MAX_PALETTE_COLORS = 200;
 
 /**
  * Create a color item element with no populated color
- * @param {Function} onDelete - Callback function for delete button click
  * @returns {HTMLElement} The color item element
  */
-export function createColorItem(onDelete = null) {
+export function createColorItem() {
   const item = createElement('div');
   item.className = 'color-item';
 
@@ -23,19 +22,6 @@ export function createColorItem(onDelete = null) {
   info.className = 'color-item-info';
   item.appendChild(info);
 
-  // Add delete button if callback provided
-  if (onDelete) {
-    const deleteButton = createElement('button');
-    deleteButton.className = 'color-delete-btn';
-    deleteButton.innerHTML = '×';
-    deleteButton.title = 'Delete color';
-    deleteButton.addEventListener('click', (e) => {
-      e.stopPropagation();
-      onDelete(color);
-    });
-    item.appendChild(deleteButton);
-  }
-
   return item;
 }
 
@@ -44,8 +30,9 @@ export function createColorItem(onDelete = null) {
  * @param {HTMLElement} item - The color item element to populate
  * @param {NamedColor|null} color - The color to create an item for, or null for empty state
  * @param {Function} onNameEdit - Callback function for name edit (color, newName)
+ * @param {Function} onDelete - Callback function for delete (color)
  */
-export function populateColorItem(item, color, onNameEdit = null) {
+export function populateColorItem(item, color, onNameEdit = null, onDelete = null) {
   const swatch = item.querySelector('.color-swatch');
   const info = item.querySelector('.color-item-info');
   clearElement(info);
@@ -77,6 +64,20 @@ export function populateColorItem(item, color, onNameEdit = null) {
 
   info.appendChild(name);
   info.appendChild(rgbValues);
+
+  // Add delete button if callback provided
+  if (onDelete) {
+    item.querySelector('.color-delete-btn')?.remove();
+    const deleteButton = createElement('button');
+    deleteButton.className = 'color-delete-btn';
+    deleteButton.innerHTML = '×';
+    deleteButton.title = 'Delete color';
+    deleteButton.addEventListener('click', (e) => {
+      e.stopPropagation();
+      onDelete(color);
+    });
+    item.appendChild(deleteButton);
+  }
 }
 
 function _setupNameEditing(nameElement, color, onNameEdit) {
@@ -266,8 +267,14 @@ export class ColorPalette {
     // Render each color
     for (let i = 0; i < this._colors.length; i++) {
       const color = this._colors[i];
-      const colorItem = createColorItem(this._deleteColor.bind(this));
-      populateColorItem(colorItem, color, this._editColorName.bind(this));
+      const colorItem = createColorItem();
+      populateColorItem(
+        colorItem,
+        color,
+        this._editColorName.bind(this),
+        this._deleteColor.bind(this)
+      );
+
 
       // Add hover event listeners for highlighting
       colorItem.addEventListener('mouseenter', () => {
