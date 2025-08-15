@@ -4,6 +4,7 @@ out vec4 fragColor;
 uniform sampler2D u_colorTexture;
 uniform bool u_showBoundaries;
 uniform int u_highlightPaletteIndex; // Index of palette color to highlight (-1 = no highlight)
+uniform int u_highlightMode; // Index into getAllHighlightModes array (0 = dim-other, 1 = hide-other, 2 = boundary)
 
 const int MIP_LEVEL = 0;
 const int OUTSIDE_COLOR_SPACE = 255;
@@ -13,13 +14,13 @@ int getPaletteIndex(float paletteIndexFloat) {
   return int(paletteIndexFloat * 255.0 + 0.5); // Round to nearest int
 }
 
-bool isBoundary(ivec2 pixelCoord, vec3 centerColor, int centerPaletteIndex) {
+int boundaryPaletteIndex(ivec2 pixelCoord, int centerPaletteIndex) {
   // Check left neighbor if not at left edge
   if (pixelCoord.x > 0) {
     vec4 left = texelFetch(u_colorTexture, pixelCoord + ivec2(-1, 0), MIP_LEVEL);
     int paletteIndex = getPaletteIndex(left.a);
     if (paletteIndex != centerPaletteIndex && paletteIndex != OUTSIDE_COLOR_SPACE) {
-      return true;
+      return paletteIndex;
     }
   }
 
@@ -28,11 +29,11 @@ bool isBoundary(ivec2 pixelCoord, vec3 centerColor, int centerPaletteIndex) {
     vec4 bottom = texelFetch(u_colorTexture, pixelCoord + ivec2(0, -1), MIP_LEVEL);
     int paletteIndex = getPaletteIndex(bottom.a);
     if (paletteIndex != centerPaletteIndex && paletteIndex != OUTSIDE_COLOR_SPACE) {
-      return true;
+      return paletteIndex;
     }
   }
 
-  return false;
+  return -1;
 }
 
 // Get boundary color that contrasts well with the underlying color
@@ -48,11 +49,34 @@ vec3 getBoundaryColor(vec3 backgroundColor) {
 // Apply highlighting effect to a color based on palette index
 vec3 applyHighlighting(vec3 baseColor, int paletteIndex) {
   if (u_highlightPaletteIndex >= 0 && paletteIndex != u_highlightPaletteIndex) {
-    // Dim non-highlighted regions
-    return baseColor * 0.4;
+    if (u_highlightMode == 0) {
+      // Dim-other mode: reduce brightness of non-highlighted regions
+      return baseColor * 0.4;
+    }
   }
 
   return baseColor;
+}
+
+// Check if we should show a boundary here.
+bool showBoundary(ivec2 pixelCoord, int paletteIndex) {
+  // Don't show boundaries when we are hiding other regions.
+  if (u_highlightMode == 1 && u_highlightPaletteIndex >= 0) return false;
+
+  // Check if we are a boundary.
+  int boundaryIndex = boundaryPaletteIndex(pixelCoord, paletteIndex);
+  bool isBoundary = boundaryIndex >= 0;
+
+  bool showBoundary = false;
+  if (u_highlightMode == 2 && u_highlightPaletteIndex >= 0) {
+    // Boundary mode: only show boundaries between highlighted and non-highlighted regions
+    showBoundary = isBoundary && (boundaryIndex == u_highlightPaletteIndex || paletteIndex == u_highlightPaletteIndex);
+  } else if (u_showBoundaries) {
+    // Normal modes: show all boundaries
+    showBoundary = isBoundary;
+  }
+
+  return showBoundary;
 }
 
 void main() {
@@ -72,14 +96,18 @@ void main() {
     return;
   }
 
+  // Check if we should hide this pixel (hide-other mode)
+  if (u_highlightMode == 1 && u_highlightPaletteIndex >= 0 && paletteIndex != u_highlightPaletteIndex) {
+    fragColor = vec4(0.0, 0.0, 0.0, 0.0); // Fully transparent for hidden regions
+    return;
+  }
+
   // Apply highlighting first (but not on boundaries)
   vec3 colorWithHighlight = applyHighlighting(baseColor, paletteIndex);
 
-  // Check if we should show boundaries and if we're at a boundary
-  bool boundary = u_showBoundaries && isBoundary(pixelCoord, baseColor, paletteIndex);
-
   // Choose final color: boundary overrides highlighting
-  vec3 finalColor = boundary ? getBoundaryColor(baseColor) : colorWithHighlight;
+  vec3 finalColor = showBoundary(pixelCoord, paletteIndex)
+      ? getBoundaryColor(baseColor) : colorWithHighlight;
 
   fragColor = vec4(finalColor, 1.0);
 }

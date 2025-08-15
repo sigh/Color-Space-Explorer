@@ -1,10 +1,10 @@
 import { getAllColorSpaces, RgbColor, getAllDistanceMetrics } from "./colorSpace.js";
 import { clearElement, createElement } from "./utils.js";
 import { MAX_PALETTE_COLORS } from "./colorPalette.js";
+import { getAllHighlightModes, ColorSpaceConfig } from "./configController.js";
 
 // Import gl-matrix for efficient matrix operations
 import '../lib/gl-matrix-min.js';
-import { ColorSpaceConfig } from "./configController.js";
 const { mat4 } = glMatrix;
 
 const OUTSIDE_COLOR_SPACE = 255;
@@ -175,6 +175,7 @@ export class CanvasRenderer {
       colorTextureLocation: gl.getUniformLocation(renderProgram, 'u_colorTexture'),
       showBoundariesLocation: gl.getUniformLocation(renderProgram, 'u_showBoundaries'),
       highlightPaletteIndexLocation: gl.getUniformLocation(renderProgram, 'u_highlightPaletteIndex'),
+      highlightModeLocation: gl.getUniformLocation(renderProgram, 'u_highlightMode'),
     };
 
     // Create and configure wireframe program
@@ -447,7 +448,7 @@ export class CanvasRenderer {
     this._renderToFramebuffer(colorSpaceConfig, paletteColors, rotationMatrix);
 
     // Second phase: Display framebuffer texture to canvas
-    this._renderToCanvas(colorSpaceConfig.showBoundaries, highlightPaletteIndex);
+    this._renderToCanvas(colorSpaceConfig.showBoundaries, highlightPaletteIndex, colorSpaceConfig.highlightMode);
 
     // Update axis labels for the current color space configuration (maintain 2D functionality)
     const polarAxis = colorSpaceConfig.usePolarCoordinates ?
@@ -481,7 +482,7 @@ export class CanvasRenderer {
     this._renderToFramebuffer(colorSpaceConfig, paletteColors, rotationMatrix);
 
     // Second phase: Display framebuffer texture to canvas
-    this._renderToCanvas(colorSpaceConfig.showBoundaries, highlightPaletteIndex);
+    this._renderToCanvas(colorSpaceConfig.showBoundaries, highlightPaletteIndex, colorSpaceConfig.highlightMode);
 
     // Third phase: Render wireframe overlay with proper depth testing
     this._renderWireframeOverlay(rotationMatrix);
@@ -587,8 +588,9 @@ export class CanvasRenderer {
    * Render phase: Render framebuffer texture to canvas for display
    * @param {boolean} showBoundaries - Whether to show region boundaries
    * @param {number|null} highlightPaletteIndex - Index of palette color to highlight (null for no highlight)
+   * @param {string} highlightMode - Highlight mode ('dim-other' or 'hide-other')
    */
-  _renderToCanvas(showBoundaries = true, highlightPaletteIndex = null) {
+  _renderToCanvas(showBoundaries = true, highlightPaletteIndex = null, highlightMode = 'dim-other') {
     const gl = this._gl;
 
     // Bind default framebuffer (canvas)
@@ -616,6 +618,10 @@ export class CanvasRenderer {
 
     // Set highlight palette index uniform (convert null to -1 for shader)
     gl.uniform1i(this._render.highlightPaletteIndexLocation, highlightPaletteIndex ?? -1);
+
+    // Set highlight mode uniform (index into getAllHighlightModes array)
+    const highlightModeIndex = getAllHighlightModes().indexOf(highlightMode);
+    gl.uniform1i(this._render.highlightModeLocation, highlightModeIndex >= 0 ? highlightModeIndex : 0);
 
     // Draw full-screen quad
     gl.drawArrays(gl.TRIANGLE_STRIP, 0, 4);

@@ -406,6 +406,16 @@ h3 {
   color: var(--text-selected);
 }
 
+.highlight-mode-container {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.highlight-mode-container label {
+  margin: 0px;
+}
+
 /* Color elements */
 .color-swatch {
   width: 32px;

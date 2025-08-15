@@ -13,7 +13,8 @@ export class ColorSpaceConfig {
     config2d = null,
     showBoundaries = true,
     distanceMetric = null,
-    distanceThreshold = null) {
+    distanceThreshold = null,
+    highlightMode = null) {
 
     this.colorSpace = colorSpace;
     this.axisSlices = axisSlices;
@@ -29,6 +30,7 @@ export class ColorSpaceConfig {
     this.showBoundaries = showBoundaries;
     this.distanceMetric = distanceMetric || getDefaultDistanceMetric();
     this.distanceThreshold = distanceThreshold ?? this.distanceMetric.maxThreshold;
+    this.highlightMode = highlightMode || getAllHighlightModes()[0];
 
     // Freeze the object to make it immutable
     Object.freeze(this.config2d);
@@ -54,6 +56,14 @@ export class ColorSpaceConfig {
 }
 
 /**
+ * Get all available highlight modes
+ * @returns {string[]} Array of highlight mode strings
+ */
+export function getAllHighlightModes() {
+  return ['dim-other', 'hide-other', 'boundary'];
+}
+
+/**
  * Configuration controller for handling axis controls and boundaries toggle
  */
 export class ConfigController {
@@ -74,6 +84,9 @@ export class ConfigController {
 
     // Distance metric dropdown element
     this._distanceMetricDropdown = container.querySelector('.distance-metric-dropdown');
+
+    // Highlight mode dropdown element
+    this._highlightModeDropdown = container.querySelector('.highlight-mode-dropdown');
 
     // Callback
     this._onColorViewUpdate = onColorSpaceChange;
@@ -102,6 +115,7 @@ export class ConfigController {
     this._setupColorSpaceControls(container, initialColorSpaceConfig);
     this._setupDistanceMetricsDropdown(initialColorSpaceConfig.distanceMetric);
     this._setupDistanceThresholdSlider(container, initialColorSpaceConfig);
+    this._setupHighlightModeDropdown(initialColorSpaceConfig.highlightMode);
 
     // Set the current state from the config
     if (!this._render3d) {
@@ -285,6 +299,18 @@ export class ConfigController {
   }
 
   /**
+   * Setup the highlight mode dropdown
+   * @param {string} initialHighlightMode - The initial highlight mode to select
+   */
+  _setupHighlightModeDropdown(initialHighlightMode) {
+    this._highlightModeDropdown.addEventListener('change', () => {
+      this._onColorViewUpdate();
+    });
+
+    this._highlightModeDropdown.value = initialHighlightMode;
+  }
+
+  /**
    * Update the axis buttons based on the current color space
    * @param {ColorSpace} colorSpace - The currently selected color space
    * @param {Axis} initialAxis - The default axis for the color space
@@ -404,7 +430,8 @@ export class ConfigController {
       config2d,
       this._boundariesToggle.checked,
       metric,
-      threshold
+      threshold,
+      this._highlightModeDropdown.value
     );
   }
 }

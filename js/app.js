@@ -1,6 +1,6 @@
 import { CanvasRenderer } from './canvasRenderer.js';
 import { CanvasUI } from './canvasUI.js';
-import { ConfigController, ColorSpaceConfig } from './configController.js';
+import { ConfigController, ColorSpaceConfig, getAllHighlightModes } from './configController.js';
 import { getAllColorSpaces, getAllDistanceMetrics, getColorSpaceByType, getDefaultDistanceMetric, getDistanceMetricById } from './colorSpace.js';
 import { ColorPalette } from './colorPalette.js';
 import { ColorDisplay } from './colorDisplay.js';
@@ -131,8 +131,12 @@ class URLStateManager {
     // Include 3D parameter if enabled
     const current3dParam = colorSpaceConfig.render3d ? '&3d' : '';
 
+    // Include highlight mode parameter if not default
+    const defaultHighlightMode = getAllHighlightModes()[0];
+    const highlightParam = (colorSpaceConfig.highlightMode !== defaultHighlightMode) ? `&h=${colorSpaceConfig.highlightMode}` : '';
+
     const fragment = window.location.hash;
-    const newURL = `${window.location.pathname}?${params.toString()}${regionsParam}${polarParam}${current3dParam}${fragment}`;
+    const newURL = `${window.location.pathname}?${params.toString()}${regionsParam}${polarParam}${current3dParam}${highlightParam}${fragment}`;
 
     window.history.replaceState(null, '', newURL);
   }
@@ -216,6 +220,13 @@ class URLStateManager {
     const showBoundaries = !params.has('noregions');
     const usePolarCoordinates = params.has('polar');
 
+    // Get highlight mode from URL, default to first available mode
+    const highlightModeParam = params.get('h');
+    const availableHighlightModes = getAllHighlightModes();
+    const highlightMode = availableHighlightModes.includes(highlightModeParam)
+      ? highlightModeParam
+      : availableHighlightModes[0];
+
     // Look for distance metric and threshold in URL parameters
     let distanceMetric = getDefaultDistanceMetric();
     let threshold = distanceMetric.maxThreshold;
@@ -236,7 +247,7 @@ class URLStateManager {
       usePolarCoordinates: usePolarCoordinates
     };
 
-    return new ColorSpaceConfig(colorSpace, axisSlices, render3d, config2d, showBoundaries, distanceMetric, threshold);
+    return new ColorSpaceConfig(colorSpace, axisSlices, render3d, config2d, showBoundaries, distanceMetric, threshold, highlightMode);
   }
 }
 
