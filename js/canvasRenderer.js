@@ -13,6 +13,8 @@ const OUTSIDE_COLOR_SPACE = 255;
 const CAMERA_FOV = Math.PI / 3; // 60 degrees
 const CAMERA_DISTANCE = 2;
 
+const CUBE_SIZE_3D = 1.1;
+
 /**
  * Calculate the size needed to fill the viewport at a given camera distance
  * @param {number} distance - Camera distance
@@ -28,7 +30,7 @@ function calculateViewportSize(distance, fov = CAMERA_FOV) {
 * WebGL2 Canvas renderer for color spaces with framebuffer rendering
 */
 export class CanvasRenderer {
-  constructor(canvasContainer, computeVertexShaderSource, computeFragmentShaderSource, vertexShaderSource, renderFragmentShaderSource) {
+  constructor(canvasContainer, shaderSources) {
     const canvas = canvasContainer.querySelector('canvas');
     this._gl = canvas.getContext('webgl2', { preserveDrawingBuffer: true });
 
@@ -47,6 +49,13 @@ export class CanvasRenderer {
       indexCount: 0
     };
 
+    // Initialize wireframe geometry object
+    this._wireframeGeometry = {
+      vertexBuffer: null,
+      indexBuffer: null,
+      indexCount: 0
+    };
+
     // Initialize transformation matrix
     this._mvpMatrix = this._createTransformationMatrix();
 
@@ -55,7 +64,7 @@ export class CanvasRenderer {
     this._axisContainer.className = 'axis-container';
     canvasContainer.appendChild(this._axisContainer);
 
-    this._initWebGL(computeVertexShaderSource, computeFragmentShaderSource, vertexShaderSource, renderFragmentShaderSource);
+    this._initWebGL(shaderSources);
   }
 
   /**
@@ -103,36 +112,44 @@ export class CanvasRenderer {
    * @returns {Promise<CanvasRenderer>} - Promise that resolves to initialized renderer
    */
   static async create(canvasContainer) {
-    // Load shaders from files - using original compute_fragment.glsl
-    const [computeVertexShaderSource, computeFragmentShaderSource, renderVertexShaderSource, renderFragmentShaderSource] = await Promise.all([
-      fetch('./shaders/compute_vertex.glsl').then(r => r.text()),
-      fetch('./shaders/compute_fragment.glsl').then(r => r.text()),
-      fetch('./shaders/render_vertex.glsl').then(r => r.text()),
-      fetch('./shaders/render_fragment.glsl').then(r => r.text())
-    ]);
+    // Define shader file names
+    const shaderFiles = [
+      'compute_vertex.glsl',
+      'compute_fragment.glsl',
+      'render_vertex.glsl',
+      'render_fragment.glsl',
+      'wireframe_vertex.glsl',
+      'wireframe_fragment.glsl'
+    ];
 
-    return new CanvasRenderer(
-      canvasContainer,
-      computeVertexShaderSource,
-      computeFragmentShaderSource,
-      renderVertexShaderSource,
-      renderFragmentShaderSource);
+    // Load all shaders and create a map from filename to source
+    const shaderSources = new Map();
+    const loadPromises = shaderFiles.map(async filename => {
+      const source = await fetch(`./shaders/${filename}`).then(r => r.text());
+      shaderSources.set(filename, source);
+    });
+
+    await Promise.all(loadPromises);
+
+    return new CanvasRenderer(canvasContainer, shaderSources);
   }
 
   /**
    * Initialize WebGL shaders and buffers
    */
-  _initWebGL(computeVertexShaderSource, computeFragmentShaderSource, renderVertexShaderSource, renderFragmentShaderSource) {
+  _initWebGL(shaderSources) {
     const gl = this._gl;
 
     // Enable depth testing for 3D
     gl.enable(gl.DEPTH_TEST);
 
     // Create and compile shaders
-    const computeVertexShader = this._createShader(gl.VERTEX_SHADER, computeVertexShaderSource);
-    const computeFragmentShader = this._createShader(gl.FRAGMENT_SHADER, computeFragmentShaderSource);
-    const renderVertexShader = this._createShader(gl.VERTEX_SHADER, renderVertexShaderSource);
-    const renderFragmentShader = this._createShader(gl.FRAGMENT_SHADER, renderFragmentShaderSource);
+    const computeVertexShader = this._createShader(gl.VERTEX_SHADER, shaderSources.get('compute_vertex.glsl'));
+    const computeFragmentShader = this._createShader(gl.FRAGMENT_SHADER, shaderSources.get('compute_fragment.glsl'));
+    const renderVertexShader = this._createShader(gl.VERTEX_SHADER, shaderSources.get('render_vertex.glsl'));
+    const renderFragmentShader = this._createShader(gl.FRAGMENT_SHADER, shaderSources.get('render_fragment.glsl'));
+    const wireframeVertexShader = this._createShader(gl.VERTEX_SHADER, shaderSources.get('wireframe_vertex.glsl'));
+    const wireframeFragmentShader = this._createShader(gl.FRAGMENT_SHADER, shaderSources.get('wireframe_fragment.glsl'));
 
     // Create and configure compute program (3D face rendering with original compute_fragment.glsl)
     const computeProgram = this._createProgram(computeVertexShader, computeFragmentShader);
@@ -160,6 +177,15 @@ export class CanvasRenderer {
       highlightPaletteIndexLocation: gl.getUniformLocation(renderProgram, 'u_highlightPaletteIndex'),
     };
 
+    // Create and configure wireframe program
+    const wireframeProgram = this._createProgram(wireframeVertexShader, wireframeFragmentShader);
+    this._wireframe = {
+      program: wireframeProgram,
+      positionLocation: gl.getAttribLocation(wireframeProgram, 'a_position'),
+      modelViewProjectionLocation: gl.getUniformLocation(wireframeProgram, 'u_modelViewProjection'),
+      depthTextureLocation: gl.getUniformLocation(wireframeProgram, 'u_depthTexture'),
+    };
+
     // Create framebuffer, texture, and vertex buffer
     this._createResources();
     gl.viewport(0, 0, this._width, this._height);
@@ -180,16 +206,20 @@ export class CanvasRenderer {
     gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_WRAP_S, gl.CLAMP_TO_EDGE);
     gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_WRAP_T, gl.CLAMP_TO_EDGE);
 
-    // Create depth buffer for proper 3D rendering
-    this._depthBuffer = gl.createRenderbuffer();
-    gl.bindRenderbuffer(gl.RENDERBUFFER, this._depthBuffer);
-    gl.renderbufferStorage(gl.RENDERBUFFER, gl.DEPTH_COMPONENT24, this._width, this._height);
+    // Create depth texture instead of renderbuffer so we can sample it
+    this._depthTexture = gl.createTexture();
+    gl.bindTexture(gl.TEXTURE_2D, this._depthTexture);
+    gl.texImage2D(gl.TEXTURE_2D, 0, gl.DEPTH_COMPONENT24, this._width, this._height, 0, gl.DEPTH_COMPONENT, gl.UNSIGNED_INT, null);
+    gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_MIN_FILTER, gl.NEAREST);
+    gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_MAG_FILTER, gl.NEAREST);
+    gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_WRAP_S, gl.CLAMP_TO_EDGE);
+    gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_WRAP_T, gl.CLAMP_TO_EDGE);
 
     // Create framebuffer
     this._framebuffer = gl.createFramebuffer();
     gl.bindFramebuffer(gl.FRAMEBUFFER, this._framebuffer);
     gl.framebufferTexture2D(gl.FRAMEBUFFER, gl.COLOR_ATTACHMENT0, gl.TEXTURE_2D, this._colorTexture, 0);
-    gl.framebufferRenderbuffer(gl.FRAMEBUFFER, gl.DEPTH_ATTACHMENT, gl.RENDERBUFFER, this._depthBuffer);
+    gl.framebufferTexture2D(gl.FRAMEBUFFER, gl.DEPTH_ATTACHMENT, gl.TEXTURE_2D, this._depthTexture, 0);
 
     // Check framebuffer completeness
     if (gl.checkFramebufferStatus(gl.FRAMEBUFFER) !== gl.FRAMEBUFFER_COMPLETE) {
@@ -234,12 +264,47 @@ export class CanvasRenderer {
   }
 
   /**
-   * Generate 3D cube geometry data programmatically (same logic as CubeRenderer)
-   * @param {Array} normalizedSlices - Normalized axis slices as [min, max] pairs
-   * @returns {Object} Object with vertices and indices arrays
+   * Create wireframe geometry buffers from vertices and indices data
+   * @param {Float32Array} vertices - Vertex data (positions only)
+   * @param {Uint16Array} indices - Line indices data
    */
+  _createWireframeGeometry(vertices, indices) {
+    const gl = this._gl;
+
+    // Create vertex buffer for wireframe
+    this._wireframeGeometry.vertexBuffer = gl.createBuffer();
+    gl.bindBuffer(gl.ARRAY_BUFFER, this._wireframeGeometry.vertexBuffer);
+    gl.bufferData(gl.ARRAY_BUFFER, vertices, gl.STATIC_DRAW);
+
+    // Create index buffer for wireframe
+    this._wireframeGeometry.indexBuffer = gl.createBuffer();
+    gl.bindBuffer(gl.ELEMENT_ARRAY_BUFFER, this._wireframeGeometry.indexBuffer);
+    gl.bufferData(gl.ELEMENT_ARRAY_BUFFER, indices, gl.STATIC_DRAW);
+
+    this._wireframeGeometry.indexCount = indices.length;
+  }
+
+  /**
+   * Generate wireframe geometry for the full unsliced cube
+   * @param {Map} normalizedAxisSlices - The normalized axis slices for the wireframe
+   * @returns {Object} Object with vertices and indices arrays for wireframe rendering
+   */
+  _generateWireframeCubeGeometry(normalizedAxisSlices) {
+    const size = CUBE_SIZE_3D;
+
+    const corners = CubeGeometryHelper.generateCubeCorners(size, normalizedAxisSlices);
+
+    // Extract only position data (first 3 components) for wireframe
+    const vertices = new Float32Array(corners.flatMap(corner => corner.slice(0, 3)));
+
+    // Generate line indices for wireframe (12 edges of the cube)
+    const indices = CubeGeometryHelper.generateWireframeIndices();
+
+    return { vertices, indices };
+  }
+
   _generate3DCubeGeometry(normalizedSlices) {
-    const size = 1.1; // Cube size for better visibility
+    const size = CUBE_SIZE_3D;
 
     // Generate all 8 corners of the cube with RGB color coordinates
     const corners = CubeGeometryHelper.generateCubeCorners(size, normalizedSlices);
@@ -406,11 +471,20 @@ export class CanvasRenderer {
     const { vertices, indices } = this._generate3DCubeGeometry(normalizedSlices);
     this._createGeometry(vertices, indices);
 
+    // Generate wireframe geometry for the unsliced cube
+
+    const wireframeAxisSlices = this._normalizedAxisSlices(colorSpaceConfig.colorSpace, new Map());
+    const wireframeData = this._generateWireframeCubeGeometry(wireframeAxisSlices);
+    this._createWireframeGeometry(wireframeData.vertices, wireframeData.indices);
+
     // First phase: Render 3D cube to framebuffer for color computation
     this._renderToFramebuffer(colorSpaceConfig, paletteColors, rotationMatrix);
 
     // Second phase: Display framebuffer texture to canvas
     this._renderToCanvas(colorSpaceConfig.showBoundaries, highlightPaletteIndex);
+
+    // Third phase: Render wireframe overlay with proper depth testing
+    this._renderWireframeOverlay(rotationMatrix);
 
     clearElement(this._axisContainer);
   }
@@ -548,6 +622,56 @@ export class CanvasRenderer {
 
     // Re-enable depth testing for subsequent 3D rendering
     gl.enable(gl.DEPTH_TEST);
+  }
+
+  /**
+   * Render wireframe overlay with manual occlusion using depth texture sampling
+   * @param {Float32Array} rotationMatrix - 4x4 rotation matrix for the cube
+   */
+  _renderWireframeOverlay(rotationMatrix = null) {
+    const gl = this._gl;
+
+    // Render wireframe to default framebuffer
+    gl.bindFramebuffer(gl.FRAMEBUFFER, null);
+    gl.viewport(0, 0, this._width, this._height);
+
+    // Enable blending for semi-transparent wireframe
+    gl.enable(gl.BLEND);
+    gl.blendFunc(gl.SRC_ALPHA, gl.ONE_MINUS_SRC_ALPHA);
+
+    // Enable depth testing, but don't write to depth buffer
+    gl.enable(gl.DEPTH_TEST);
+    gl.depthMask(false);
+
+    // Use wireframe program
+    gl.useProgram(this._wireframe.program);
+
+    // Set up vertex attributes for wireframe
+    gl.bindBuffer(gl.ARRAY_BUFFER, this._wireframeGeometry.vertexBuffer);
+    gl.bindBuffer(gl.ELEMENT_ARRAY_BUFFER, this._wireframeGeometry.indexBuffer);
+
+    gl.enableVertexAttribArray(this._wireframe.positionLocation);
+    gl.vertexAttribPointer(this._wireframe.positionLocation, 3, gl.FLOAT, false, 12, 0);
+
+    // Compute transformation matrix (apply rotation if provided)
+    const finalMvpMatrix = rotationMatrix
+      ? mat4.multiply(mat4.create(), this._mvpMatrix, rotationMatrix)
+      : this._mvpMatrix;
+
+    // Set transformation matrix uniform
+    gl.uniformMatrix4fv(this._wireframe.modelViewProjectionLocation, false, finalMvpMatrix);
+
+    // Bind depth texture for manual occlusion testing
+    gl.activeTexture(gl.TEXTURE1);
+    gl.bindTexture(gl.TEXTURE_2D, this._depthTexture);
+    gl.uniform1i(this._wireframe.depthTextureLocation, 1);
+
+    // Draw wireframe lines
+    gl.drawElements(gl.LINES, this._wireframeGeometry.indexCount, gl.UNSIGNED_SHORT, 0);
+
+    // Restore depth mask and disable blending
+    gl.depthMask(true);
+    gl.disable(gl.BLEND);
   }
 
   /**
@@ -791,5 +915,30 @@ class CubeGeometryHelper {
       // Check the bit corresponding to the axis index
       return ((i >> axisIndex) & 1) === direction;
     });
+  }
+
+  /**
+   * Generate wireframe indices for a cube's 12 edges
+   * @returns {Uint16Array} Array of line indices for wireframe rendering
+   */
+  static generateWireframeIndices() {
+    const indices = [];
+    const numVertices = 8;
+
+    for (let i = 0; i < numVertices; i++) {
+      // Only create edges from vertices where the given axis bit is 1.
+      // This elegantly prevents duplicate edges (e.g., creating 0-1 and 1-0).
+
+      // Connect along X axis (flips the 1st bit)
+      if (i & 1) indices.push(i, i ^ 1);
+
+      // Connect along Y axis (flips the 2nd bit)
+      if (i & 2) indices.push(i, i ^ 2);
+
+      // Connect along Z axis (flips the 3rd bit)
+      if (i & 4) indices.push(i, i ^ 4);
+    }
+
+    return new Uint16Array(indices);
   }
 }
