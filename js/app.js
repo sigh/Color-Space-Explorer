@@ -126,7 +126,7 @@ class URLStateManager {
       distanceMetric.thresholdToString(colorSpaceConfig.distanceThreshold));
 
     const regionsParam = colorSpaceConfig.showBoundaries ? '' : '&noregions';
-    const polarParam = (!colorSpaceConfig.render3d && colorSpaceConfig.config2d?.usePolarCoordinates) ? '&polar' : '';
+    const polarParam = (!colorSpaceConfig.render3d && colorSpaceConfig.usePolarCoordinates) ? '&polar' : '';
 
     // Include 3D parameter if enabled
     const current3dParam = colorSpaceConfig.render3d ? '&3d' : '';
@@ -242,12 +242,7 @@ class URLStateManager {
       }
     }
 
-    // Create config2d only if in 2D mode
-    const config2d = render3d ? null : {
-      usePolarCoordinates: usePolarCoordinates
-    };
-
-    return new ColorSpaceConfig(colorSpace, axisSlices, render3d, config2d, showBoundaries, distanceMetric, threshold, highlightMode);
+    return new ColorSpaceConfig(colorSpace, axisSlices, render3d, usePolarCoordinates, showBoundaries, distanceMetric, threshold, highlightMode);
   }
 }
 

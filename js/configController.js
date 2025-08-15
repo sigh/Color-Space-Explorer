@@ -10,7 +10,7 @@ export class ColorSpaceConfig {
     colorSpace,
     axisSlices,
     render3d = false,
-    config2d = null,
+    usePolarCoordinates = false,
     showBoundaries = true,
     distanceMetric = null,
     distanceThreshold = null,
@@ -19,13 +19,7 @@ export class ColorSpaceConfig {
     this.colorSpace = colorSpace;
     this.axisSlices = axisSlices;
     this.render3d = render3d;
-    this.config2d = null;
-    if (!this.render3d) {
-      this.config2d = {
-        usePolarCoordinates: false
-      };
-      Object.assign(this.config2d, config2d || {});
-    }
+    this.usePolarCoordinates = !render3d && usePolarCoordinates && colorSpace.availablePolarAxis(this.currentAxis);
 
     this.showBoundaries = showBoundaries;
     this.distanceMetric = distanceMetric || getDefaultDistanceMetric();
@@ -33,7 +27,6 @@ export class ColorSpaceConfig {
     this.highlightMode = highlightMode || getAllHighlightModes()[0];
 
     // Freeze the object to make it immutable
-    Object.freeze(this.config2d);
     Object.freeze(this);
   }
 
@@ -48,10 +41,6 @@ export class ColorSpaceConfig {
     for (const values of this.axisSlices.values()) {
       return values[0];
     }
-  }
-
-  get usePolarCoordinates() {
-    return this.config2d?.usePolarCoordinates || false;
   }
 }
 
@@ -119,7 +108,7 @@ export class ConfigController {
 
     // Set the current state from the config
     if (!this._render3d) {
-      this._polarToggle.checked = initialColorSpaceConfig.config2d.usePolarCoordinates;
+      this._polarToggle.checked = initialColorSpaceConfig.usePolarCoordinates;
     }
     this._boundariesToggle.checked = initialColorSpaceConfig.showBoundaries;
 
@@ -418,16 +407,13 @@ export class ConfigController {
       axisSlices.set(this._currentAxis, [value, value]);
     }
 
-    // Only collect 2D config if in 2D mode
-    const config2d = this._render3d ? null : {
-      usePolarCoordinates: this._polarToggle.checked && this._colorSpace.availablePolarAxis(this._currentAxis)
-    };
+    const usePolarCoordinates = this._polarToggle.checked;
 
     return new ColorSpaceConfig(
       this._colorSpace,
       axisSlices,
       this._render3d,
-      config2d,
+      usePolarCoordinates,
       this._boundariesToggle.checked,
       metric,
       threshold,
