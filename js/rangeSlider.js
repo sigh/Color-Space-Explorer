@@ -109,7 +109,24 @@ export class RangeSlider {
       this._options.onChange(...this._values);
     };
 
+    const handleDoubleClick = (e) => {
+      e.preventDefault();
+
+      if (this._values.length === 1) {
+        // Single slider: set to max
+        this._values[0] = this._options.max;
+      } else {
+        // Multi-thumb slider: set range to min and max
+        this._values[0] = this._options.min;
+        this._values[this._values.length - 1] = this._options.max;
+      }
+
+      this._updatePositions();
+      this._options.onChange(...this._values);
+    };
+
     this._container.addEventListener('mousedown', startDrag);
+    this._container.addEventListener('dblclick', handleDoubleClick);
     document.addEventListener('mousemove', handleMouseMove);
     document.addEventListener('mouseup', stopDrag);
   }

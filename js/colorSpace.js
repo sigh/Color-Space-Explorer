@@ -240,12 +240,14 @@ export class DistanceMetric {
    * @param {string} displayName - The human-readable name for the metric
    * @param {number} minThreshold - Minimum threshold value for the metric
    * @param {number} maxThreshold - Maximum threshold value for the metric (also default)
+   * @param {number} defaultThreshold - Default threshold value for the metric
    */
-  constructor(id, displayName, minThreshold, maxThreshold) {
+  constructor(id, displayName, minThreshold, maxThreshold, defaultThreshold) {
     this.id = id;
     this.displayName = displayName;
     this.minThreshold = minThreshold;
     this.maxThreshold = maxThreshold;
+    this.defaultThreshold = defaultThreshold;
 
     // Precalculate logarithmic values for slider conversion
     this.logMinThreshold = Math.log(minThreshold);
@@ -269,11 +271,11 @@ export class DistanceMetric {
  */
 const DISTANCE_METRICS = Object.freeze([
   // Delta E: typical values range from 0-100, with 1-5 being perceptually similar
-  new DistanceMetric('lab-d', 'L*a*b* (Delta E)', 0.1, 100.0),
+  new DistanceMetric('lab-d', 'L*a*b* (Delta E)', 0.1, 100.0, 10),
   // L*u*v* Delta E: similar to L*a*b*, values range from 0-100, with 1-5 being perceptually similar
-  new DistanceMetric('luv-d', 'L*u*v* (Delta E)', 0.1, 100.0),
+  new DistanceMetric('luv-d', 'L*u*v* (Delta E)', 0.1, 100.0, 10),
   // RGB Euclidean: values range from 0-√3 ≈ 1.732, with 0.1 being very similar
-  new DistanceMetric('rgb-d', 'RGB (Euclidean)', 0.01, 1.0)
+  new DistanceMetric('rgb-d', 'RGB (Euclidean)', 0.01, 1.0, 0.1)
 ]);
 
 /**

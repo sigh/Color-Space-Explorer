@@ -23,7 +23,7 @@ export class ColorSpaceConfig {
 
     this.showBoundaries = showBoundaries;
     this.distanceMetric = distanceMetric || getDefaultDistanceMetric();
-    this.distanceThreshold = distanceThreshold ?? this.distanceMetric.maxThreshold;
+    this.distanceThreshold = distanceThreshold ?? this.distanceMetric.defaultThreshold;
     this.highlightMode = highlightMode || getAllHighlightModes()[0];
 
     // Freeze the object to make it immutable

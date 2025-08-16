@@ -211,9 +211,9 @@ class URLStateManager {
 
     const render3d = params.has('3d');
 
-    if (!render3d && axisSlices.length === 0) {
+    if (!render3d && axisSlices.size === 0) {
       // Set defaults to use if we can't find valid parameters
-      let axis = colorSpace.getDefaultAxis();
+      const axis = colorSpace.getDefaultAxis();
       axisSlices.set(axis, [axis.defaultValue, axis.defaultValue]);
     }
 
@@ -229,7 +229,7 @@ class URLStateManager {
 
     // Look for distance metric and threshold in URL parameters
     let distanceMetric = getDefaultDistanceMetric();
-    let threshold = distanceMetric.maxThreshold;
+    let threshold = distanceMetric.defaultThreshold;
 
     // Check each available distance metric to see if it's in the URL
     for (const metric of getAllDistanceMetrics()) {
