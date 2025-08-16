@@ -6,6 +6,8 @@ uniform int u_colorSpaceIndex; // 0=RGB, 1=HSV, 2=HSL
 uniform ivec2 u_polarAxes; // [rAxisIndex, thetaAxisIndex] or [-1, -1] if not polar
 uniform int u_distanceMetric; // 0=Delta E (LAB), 1=L*u*v* (Delta E), 2=RGB Euclidean
 uniform float u_distanceThreshold; // Maximum distance for color matching
+uniform int u_highlightPaletteIndex; // Index of palette color to highlight (-1 = no highlight)
+uniform int u_highlightMode; // Index into getAllHighlightModes array (0 = dim-other, 1 = hide-other, 2 = boundary)
 
 const int MAX_PALETTE_COLORS = 200;
 uniform vec3 u_paletteColors[MAX_PALETTE_COLORS]; // Maximum palette colors
@@ -236,9 +238,14 @@ void main() {
     color = hslToRgb(colorCoord.x, colorCoord.y, colorCoord.z);
   }
 
-  // Store closest index as alpha (normalized to 0-1 range)
   int closestIndex = findClosestPaletteIndex(color);
-  float alpha = float(closestIndex) / COLOR_INDEX_SCALE;
 
+  // Handle hide-other highlight mode by discarding fragments that should be hidden
+  if (u_highlightMode == 1 && u_highlightPaletteIndex >= 0 && closestIndex != u_highlightPaletteIndex) {
+    discard; // Completely remove fragments that don't match the highlighted color
+  }
+
+  // Store closest index as alpha (normalized to 0-1 range)
+  float alpha = float(closestIndex) / COLOR_INDEX_SCALE;
   fragColor = vec4(color, alpha);
 }

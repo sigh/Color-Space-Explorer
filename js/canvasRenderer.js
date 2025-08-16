@@ -164,6 +164,8 @@ export class CanvasRenderer {
       paletteCountLocation: gl.getUniformLocation(computeProgram, 'u_paletteCount'),
       distanceMetricLocation: gl.getUniformLocation(computeProgram, 'u_distanceMetric'),
       distanceThresholdLocation: gl.getUniformLocation(computeProgram, 'u_distanceThreshold'),
+      highlightPaletteIndexLocation: gl.getUniformLocation(computeProgram, 'u_highlightPaletteIndex'),
+      highlightModeLocation: gl.getUniformLocation(computeProgram, 'u_highlightMode'),
     };
 
     // Create and configure render program
@@ -449,7 +451,7 @@ export class CanvasRenderer {
     const rotationMatrix = this._createFaceRotationMatrix(colorSpaceConfig);
 
     // First phase: Render 3D face to framebuffer for color computation
-    this._renderToFramebuffer(colorSpaceConfig, paletteColors, rotationMatrix);
+    this._renderToFramebuffer(colorSpaceConfig, paletteColors, rotationMatrix, highlightPaletteIndex);
 
     // Second phase: Display framebuffer texture to canvas
     this._renderToCanvas(colorSpaceConfig.showBoundaries, highlightPaletteIndex, colorSpaceConfig.highlightMode);
@@ -487,7 +489,7 @@ export class CanvasRenderer {
     this._createWireframeGeometry(wireframeData.vertices, wireframeData.indices);
 
     // First phase: Render 3D cube to framebuffer for color computation
-    this._renderToFramebuffer(colorSpaceConfig, paletteColors, rotationMatrix);
+    this._renderToFramebuffer(colorSpaceConfig, paletteColors, rotationMatrix, highlightPaletteIndex);
 
     // Second phase: Display framebuffer texture to canvas
     this._renderToCanvas(colorSpaceConfig.showBoundaries, highlightPaletteIndex, colorSpaceConfig.highlightMode);
@@ -513,8 +515,9 @@ export class CanvasRenderer {
    * @param {ColorSpaceConfig} colorSpaceConfig
    * @param {Array<NamedColor>} paletteColors - Array of palette colors to find closest matches for
    * @param {Float32Array} rotationMatrix - 4x4 rotation matrix for the cube (only used for 3D)
+   * @param {number} highlightPaletteIndex - Index of palette color to highlight (-1 for no highlight)
    */
-  _renderToFramebuffer(colorSpaceConfig, paletteColors, rotationMatrix = null) {
+  _renderToFramebuffer(colorSpaceConfig, paletteColors, rotationMatrix = null, highlightPaletteIndex = -1) {
     const gl = this._gl;
 
     // Bind framebuffer for rendering
@@ -578,6 +581,13 @@ export class CanvasRenderer {
       paletteData[i * 3 + 2] = b;
     }
     gl.uniform3fv(this._compute.paletteColorsLocation, paletteData);
+
+    // Set highlight uniforms
+    gl.uniform1i(this._compute.highlightPaletteIndexLocation, highlightPaletteIndex);
+    
+    // Set highlight mode uniform (index into getAllHighlightModes array)
+    const highlightModeIndex = getAllHighlightModes().indexOf(colorSpaceConfig.highlightMode);
+    gl.uniform1i(this._compute.highlightModeLocation, highlightModeIndex >= 0 ? highlightModeIndex : 0);
 
     // Draw using unified geometry
     gl.drawElements(gl.TRIANGLES, this._geometry.indexCount, gl.UNSIGNED_SHORT, 0);

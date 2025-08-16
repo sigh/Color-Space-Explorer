@@ -96,12 +96,6 @@ void main() {
     return;
   }
 
-  // Check if we should hide this pixel (hide-other mode)
-  if (u_highlightMode == 1 && u_highlightPaletteIndex >= 0 && paletteIndex != u_highlightPaletteIndex) {
-    fragColor = vec4(0.0, 0.0, 0.0, 0.0); // Fully transparent for hidden regions
-    return;
-  }
-
   // Apply highlighting first (but not on boundaries)
   vec3 colorWithHighlight = applyHighlighting(baseColor, paletteIndex);
 
