@@ -127,6 +127,7 @@ class URLStateManager {
       distanceMetric.thresholdToString(colorSpaceConfig.distanceThreshold));
 
     const regionsParam = colorSpaceConfig.showBoundaries ? '' : '&noregions';
+    const hideUnmatchedParam = colorSpaceConfig.hideUnmatchedColors ? '&onlymatched' : '';
     const polarParam = (!colorSpaceConfig.render3d && colorSpaceConfig.usePolarCoordinates) ? '&polar' : '';
 
     // Include 3D parameter if enabled
@@ -137,7 +138,7 @@ class URLStateManager {
     const highlightParam = (colorSpaceConfig.highlightMode !== defaultHighlightMode) ? `&h=${colorSpaceConfig.highlightMode}` : '';
 
     const fragment = window.location.hash;
-    const newURL = `${window.location.pathname}?${params.toString()}${regionsParam}${polarParam}${current3dParam}${highlightParam}${fragment}`;
+    const newURL = `${window.location.pathname}?${params.toString()}${regionsParam}${hideUnmatchedParam}${polarParam}${current3dParam}${highlightParam}${fragment}`;
 
     window.history.replaceState(null, '', newURL);
   }
@@ -219,6 +220,7 @@ class URLStateManager {
     }
 
     const showBoundaries = !params.has('noregions');
+    const hideUnmatchedColors = params.has('onlymatched');
     const usePolarCoordinates = params.has('polar');
 
     // Get highlight mode from URL, default to first available mode
@@ -243,7 +245,16 @@ class URLStateManager {
       }
     }
 
-    return new ColorSpaceConfig(colorSpace, axisSlices, render3d, usePolarCoordinates, showBoundaries, distanceMetric, threshold, highlightMode);
+    return new ColorSpaceConfig(
+      colorSpace,
+      axisSlices,
+      render3d,
+      usePolarCoordinates,
+      showBoundaries,
+      distanceMetric,
+      threshold,
+      highlightMode,
+      hideUnmatchedColors);
   }
 }
 

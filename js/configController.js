@@ -14,7 +14,8 @@ export class ColorSpaceConfig {
     showBoundaries = true,
     distanceMetric = null,
     distanceThreshold = null,
-    highlightMode = null) {
+    highlightMode = null,
+    hideUnmatchedColors = false) {
 
     this.colorSpace = colorSpace;
     this.axisSlices = axisSlices;
@@ -25,6 +26,7 @@ export class ColorSpaceConfig {
     this.distanceMetric = distanceMetric || getDefaultDistanceMetric();
     this.distanceThreshold = distanceThreshold ?? this.distanceMetric.defaultThreshold;
     this.highlightMode = highlightMode || getAllHighlightModes()[0];
+    this.hideUnmatchedColors = hideUnmatchedColors;
 
     // Freeze the object to make it immutable
     Object.freeze(this);
@@ -68,6 +70,9 @@ export class ConfigController {
     // Boundaries toggle element
     this._boundariesToggle = container.querySelector('.boundaries-toggle');
 
+    // Hide unmatched colors toggle element
+    this._hideUnmatchedToggle = container.querySelector('.hide-unmatched-toggle');
+
     // Polar coordinates toggle element
     this._polarToggle = container.querySelector('.polar-toggle');
 
@@ -82,6 +87,10 @@ export class ConfigController {
 
     // Initialize the UI with the provided color space configuration
     this._boundariesToggle.addEventListener('change', () => {
+      this._onColorViewUpdate();
+    });
+
+    this._hideUnmatchedToggle.addEventListener('change', () => {
       this._onColorViewUpdate();
     });
 
@@ -111,6 +120,7 @@ export class ConfigController {
       this._polarToggle.checked = initialColorSpaceConfig.usePolarCoordinates;
     }
     this._boundariesToggle.checked = initialColorSpaceConfig.showBoundaries;
+    this._hideUnmatchedToggle.checked = initialColorSpaceConfig.hideUnmatchedColors;
 
     // Update visibility of 2D controls
     this._updateDimControlsVisibility();
@@ -417,7 +427,8 @@ export class ConfigController {
       this._boundariesToggle.checked,
       metric,
       threshold,
-      this._highlightModeDropdown.value
+      this._highlightModeDropdown.value,
+      this._hideUnmatchedToggle.checked
     );
   }
 }

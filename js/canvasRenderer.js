@@ -166,6 +166,7 @@ export class CanvasRenderer {
       distanceThresholdLocation: gl.getUniformLocation(computeProgram, 'u_distanceThreshold'),
       highlightPaletteIndexLocation: gl.getUniformLocation(computeProgram, 'u_highlightPaletteIndex'),
       highlightModeLocation: gl.getUniformLocation(computeProgram, 'u_highlightMode'),
+      hideUnmatchedColorsLocation: gl.getUniformLocation(computeProgram, 'u_hideUnmatchedColors'),
     };
 
     // Create and configure render program
@@ -584,10 +585,13 @@ export class CanvasRenderer {
 
     // Set highlight uniforms
     gl.uniform1i(this._compute.highlightPaletteIndexLocation, highlightPaletteIndex);
-    
+
     // Set highlight mode uniform (index into getAllHighlightModes array)
     const highlightModeIndex = getAllHighlightModes().indexOf(colorSpaceConfig.highlightMode);
     gl.uniform1i(this._compute.highlightModeLocation, highlightModeIndex >= 0 ? highlightModeIndex : 0);
+
+    // Set hide unmatched colors uniform
+    gl.uniform1i(this._compute.hideUnmatchedColorsLocation, colorSpaceConfig.hideUnmatchedColors ? 1 : 0);
 
     // Draw using unified geometry
     gl.drawElements(gl.TRIANGLES, this._geometry.indexCount, gl.UNSIGNED_SHORT, 0);
