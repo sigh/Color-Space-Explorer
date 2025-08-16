@@ -5,7 +5,7 @@ import { getAllHighlightModes, ColorSpaceConfig } from "./configController.js";
 
 // Import gl-matrix for efficient matrix operations
 import '../lib/gl-matrix-min.js';
-const { mat4 } = glMatrix;
+const { mat4, vec3, vec2 } = glMatrix;
 
 const OUTSIDE_COLOR_SPACE = 255;
 
@@ -14,6 +14,7 @@ const CAMERA_FOV = Math.PI / 3; // 60 degrees
 const CAMERA_DISTANCE = 2;
 
 const CUBE_SIZE_3D = 1.1;
+const CROSS_SECTION_WIDTH = CUBE_SIZE_3D / 64.0;
 
 /**
  * Calculate the size needed to fill the viewport at a given camera distance
@@ -43,7 +44,7 @@ export class CanvasRenderer {
     this._paletteColors = []; // The palette colors used for indexing.
 
     // Initialize unified geometry object
-    this._geometry = {
+    this._colorGeometry = {
       vertexBuffer: null,
       indexBuffer: null,
       indexCount: 0
@@ -248,44 +249,27 @@ export class CanvasRenderer {
 
   /**
    * Create geometry buffers from vertices and indices data
-   * @param {Float32Array} vertices - Vertex data
-   * @param {Uint16Array} indices - Index data
+   * @param {Array<number>} vertices - Vertex data
+   * @param {Array<number>} indices - Index data
    */
-  _createGeometry(vertices, indices) {
+  _createGeometryBuffers(vertices, indices) {
     const gl = this._gl;
 
     // Create vertex buffer
-    this._geometry.vertexBuffer = gl.createBuffer();
-    gl.bindBuffer(gl.ARRAY_BUFFER, this._geometry.vertexBuffer);
-    gl.bufferData(gl.ARRAY_BUFFER, vertices, gl.STATIC_DRAW);
+    const vertexBuffer = gl.createBuffer();
+    gl.bindBuffer(gl.ARRAY_BUFFER, vertexBuffer);
+    gl.bufferData(gl.ARRAY_BUFFER, new Float32Array(vertices.flat()), gl.STATIC_DRAW);
 
     // Create index buffer
-    this._geometry.indexBuffer = gl.createBuffer();
-    gl.bindBuffer(gl.ELEMENT_ARRAY_BUFFER, this._geometry.indexBuffer);
-    gl.bufferData(gl.ELEMENT_ARRAY_BUFFER, indices, gl.STATIC_DRAW);
+    const indexBuffer = gl.createBuffer();
+    gl.bindBuffer(gl.ELEMENT_ARRAY_BUFFER, indexBuffer);
+    gl.bufferData(gl.ELEMENT_ARRAY_BUFFER, new Uint16Array(indices), gl.STATIC_DRAW);
 
-    this._geometry.indexCount = indices.length;
-  }
-
-  /**
-   * Create wireframe geometry buffers from vertices and indices data
-   * @param {Float32Array} vertices - Vertex data (positions only)
-   * @param {Uint16Array} indices - Line indices data
-   */
-  _createWireframeGeometry(vertices, indices) {
-    const gl = this._gl;
-
-    // Create vertex buffer for wireframe
-    this._wireframeGeometry.vertexBuffer = gl.createBuffer();
-    gl.bindBuffer(gl.ARRAY_BUFFER, this._wireframeGeometry.vertexBuffer);
-    gl.bufferData(gl.ARRAY_BUFFER, vertices, gl.STATIC_DRAW);
-
-    // Create index buffer for wireframe
-    this._wireframeGeometry.indexBuffer = gl.createBuffer();
-    gl.bindBuffer(gl.ELEMENT_ARRAY_BUFFER, this._wireframeGeometry.indexBuffer);
-    gl.bufferData(gl.ELEMENT_ARRAY_BUFFER, indices, gl.STATIC_DRAW);
-
-    this._wireframeGeometry.indexCount = indices.length;
+    return {
+      vertexBuffer,
+      indexBuffer,
+      indexCount: indices.length
+    };
   }
 
   /**
@@ -296,10 +280,11 @@ export class CanvasRenderer {
   _generateWireframeCubeGeometry(normalizedAxisSlices) {
     const size = CUBE_SIZE_3D;
 
-    const corners = CubeGeometryHelper.generateCubeCorners(size, normalizedAxisSlices);
+    const corners = CubeGeometryHelper.generateCubeCornerColors(normalizedAxisSlices);
 
     // Extract only position data (first 3 components) for wireframe
-    const vertices = new Float32Array(corners.flatMap(corner => corner.slice(0, 3)));
+    const vertices = corners.map(
+      c => CubeGeometryHelper.colorCoordToPosition(c, size));
 
     // Generate line indices for wireframe (12 edges of the cube)
     const indices = CubeGeometryHelper.generateWireframeIndices();
@@ -311,7 +296,9 @@ export class CanvasRenderer {
     const size = CUBE_SIZE_3D;
 
     // Generate all 8 corners of the cube with RGB color coordinates
-    const corners = CubeGeometryHelper.generateCubeCorners(size, normalizedSlices);
+    const corners = CubeGeometryHelper.generateCubeCornerColors(
+      normalizedSlices).map(
+        c => CubeGeometryHelper.colorCoordToVertex(c, size));
 
     // Generate faces programmatically - each face shares one coordinate
     const vertices = [];
@@ -320,32 +307,29 @@ export class CanvasRenderer {
     // Generate 6 faces (3 axes × 2 directions each)
     for (let axis = 0; axis < 3; axis++) {
       for (let direction = 0; direction < 2; direction++) {
-        const baseIndex = vertices.length / 6;  // Each vertex has 6 components
+        const baseIndex = vertices.length;
 
         // Find the 4 corners that belong to this face
         const faceCorners = CubeGeometryHelper.filterCornersByFace(
           corners, axis, direction);
 
         // Add vertices for this face
-        vertices.push(...faceCorners.flat());
+        vertices.push(...faceCorners);
 
         // Add triangles for this face (quad split into 2 triangles)
         indices.push(...CubeGeometryHelper.generateFaceIndexes(baseIndex));
       }
     }
 
-    return {
-      vertices: new Float32Array(vertices),
-      indices: new Uint16Array(indices)
-    };
+    return { vertices, indices };
   }
 
   /**
-   * Generate face geometry data for a specific color space configuration
+   * Generate 2d surface geometry data for a specific color space configuration
    * @param {ColorSpaceConfig} colorSpaceConfig - The color space configuration
    * @returns {Object} Object with vertices and indices arrays
    */
-  _generateFaceGeometry(colorSpaceConfig) {
+  _generate2DSurfaceGeometry(colorSpaceConfig) {
     // Calculate size to fill the viewport at the 2D camera distance
     const size = calculateViewportSize(CAMERA_DISTANCE);
 
@@ -357,8 +341,9 @@ export class CanvasRenderer {
       colorSpace, colorSpaceConfig.axisSlices);
 
     // Generate cube corners
-    const allCorners = CubeGeometryHelper.generateCubeCorners(
-      size, normalizedAxisSlices);
+    const allCorners = CubeGeometryHelper.generateCubeCornerColors(
+      normalizedAxisSlices).map(
+        c => CubeGeometryHelper.colorCoordToVertex(c, size));
 
     // Get the face that corresponds to the fixed axis
     // Direction 1 means the positive face of the axis
@@ -371,8 +356,8 @@ export class CanvasRenderer {
     }
 
     // Create vertices array from corners and simple indices for single face
-    const vertices = new Float32Array(faceCorners.flat());
-    const indices = new Uint16Array(CubeGeometryHelper.generateFaceIndexes(0));
+    const vertices = faceCorners;
+    const indices = CubeGeometryHelper.generateFaceIndexes(0);
 
     return { vertices, indices };
   }
@@ -445,8 +430,8 @@ export class CanvasRenderer {
       paletteColors, highlightColor);
 
     // Regenerate 2D face geometry
-    const { vertices, indices } = this._generateFaceGeometry(colorSpaceConfig);
-    this._createGeometry(vertices, indices);
+    const { vertices, indices } = this._generate2DSurfaceGeometry(colorSpaceConfig);
+    this._colorGeometry = this._createGeometryBuffers(vertices, indices);
 
     // Generate rotation matrix to orient the face toward the camera
     const rotationMatrix = this._createFaceRotationMatrix(colorSpaceConfig);
@@ -481,13 +466,21 @@ export class CanvasRenderer {
     // Get normalized axis slices and create 3D cube geometry
     const normalizedSlices = this._normalizedAxisSlices(colorSpaceConfig.colorSpace, colorSpaceConfig.axisSlices);
     const { vertices, indices } = this._generate3DCubeGeometry(normalizedSlices);
-    this._createGeometry(vertices, indices);
+
+    // Add internal slices if we can see inside of the cube.
+    if (colorSpaceConfig.hideUnmatchedColors || colorSpaceConfig.highlightMode === 'hide-other') {
+      const sliceGeometry = this._generateInternalGeometry(normalizedSlices, rotationMatrix);
+      const vertexOffset = vertices.length;
+      vertices.push(...sliceGeometry.vertices);
+      indices.push(...sliceGeometry.indices.map(i => i + vertexOffset));
+    }
+    this._colorGeometry = this._createGeometryBuffers(vertices, indices);
 
     // Generate wireframe geometry for the unsliced cube
-
     const wireframeAxisSlices = this._normalizedAxisSlices(colorSpaceConfig.colorSpace, new Map());
     const wireframeData = this._generateWireframeCubeGeometry(wireframeAxisSlices);
-    this._createWireframeGeometry(wireframeData.vertices, wireframeData.indices);
+    this._wireframeGeometry = this._createGeometryBuffers(
+      wireframeData.vertices, wireframeData.indices);
 
     // First phase: Render 3D cube to framebuffer for color computation
     this._renderToFramebuffer(colorSpaceConfig, paletteColors, rotationMatrix, highlightPaletteIndex);
@@ -499,6 +492,80 @@ export class CanvasRenderer {
     this._renderWireframeOverlay(rotationMatrix);
 
     clearElement(this._axisContainer);
+  }
+
+  /**
+   * Generate internal cross-sections of the cube, with surfaces facing the camera.
+   * @param {Array} normalizedSlices - Normalized axis ranges
+   * @param {Array} rotationMatrix - 4x4 rotation matrix
+   * @returns {Object} Object with combined vertices and indices arrays
+   */
+  _generateInternalGeometry(normalizedSlices, rotationMatrix) {
+    const vertices = [];
+    const indices = [];
+
+    const cornerColors = CubeGeometryHelper.generateCubeCornerColors(normalizedSlices);
+
+    // Transform corners to view space so that cross-sections are along the z-axis
+    const rotatedCorners = cornerColors.map(corner => {
+      return vec3.transformMat4(
+        vec3.create(),
+        CubeGeometryHelper.colorCoordToPosition(corner, CUBE_SIZE_3D),
+        rotationMatrix);
+    });
+
+    const edgeIndices = CubeGeometryHelper.generateWireframeIndices();
+
+    // Find depth bounds and generate cross-sections
+    const zValues = rotatedCorners.map(corner => corner[2]);
+    const minZ = Math.min(...zValues);
+    const maxZ = Math.max(...zValues);
+
+    // Generate cross-sections (exclude endpoints which are handled by cube faces)
+    for (let z = minZ + CROSS_SECTION_WIDTH; z < maxZ; z += CROSS_SECTION_WIDTH) {
+      const intersections = [];
+      let vertexOffset = vertices.length;
+
+      // Find edges that intersect with the cross-section plane
+      for (let i = 0; i < edgeIndices.length; i += 2) {
+        const startIndex = edgeIndices[i];
+        const endIndex = edgeIndices[i + 1];
+        const startZ = zValues[startIndex];
+        const endZ = zValues[endIndex];
+
+        // Check if edge crosses the plane
+        if ((startZ <= z && endZ >= z) || (startZ >= z && endZ <= z)) {
+          const t = (z - startZ) / (endZ - startZ);
+
+          // Store 2D intersection point for polygon sorting
+          const start = rotatedCorners[startIndex];
+          const end = rotatedCorners[endIndex];
+          const intersection = vec3.lerp(vec3.create(), start, end, t);
+          intersections.push([intersection[0], intersection[1]]);
+
+          // Interpolate full vertex data (position + color coordinates)
+          const interpColor = cornerColors[startIndex].map(
+            (v, j) => v + (cornerColors[endIndex][j] - v) * t);
+          vertices.push(
+            CubeGeometryHelper.colorCoordToVertex(interpColor, CUBE_SIZE_3D));
+        }
+      }
+
+      // Triangulate polygon if we have enough vertices
+      if (intersections.length >= 3) {
+        const sortOrder = polygonVertexSortOrder(intersections);
+        // Fan triangulation from first vertex
+        for (let i = 0; i < sortOrder.length - 2; i++) {
+          indices.push(
+            vertexOffset + sortOrder[0],
+            vertexOffset + sortOrder[i + 1],
+            vertexOffset + sortOrder[i + 2]
+          );
+        }
+      }
+    }
+
+    return { vertices, indices };
   }
 
   /**
@@ -533,8 +600,8 @@ export class CanvasRenderer {
     gl.useProgram(this._compute.program);
 
     // Set up vertex attributes
-    gl.bindBuffer(gl.ARRAY_BUFFER, this._geometry.vertexBuffer);
-    gl.bindBuffer(gl.ELEMENT_ARRAY_BUFFER, this._geometry.indexBuffer);
+    gl.bindBuffer(gl.ARRAY_BUFFER, this._colorGeometry.vertexBuffer);
+    gl.bindBuffer(gl.ELEMENT_ARRAY_BUFFER, this._colorGeometry.indexBuffer);
 
     gl.enableVertexAttribArray(this._compute.positionLocation);
     gl.vertexAttribPointer(this._compute.positionLocation, 3, gl.FLOAT, false, 24, 0);
@@ -594,7 +661,7 @@ export class CanvasRenderer {
     gl.uniform1i(this._compute.hideUnmatchedColorsLocation, colorSpaceConfig.hideUnmatchedColors ? 1 : 0);
 
     // Draw using unified geometry
-    gl.drawElements(gl.TRIANGLES, this._geometry.indexCount, gl.UNSIGNED_SHORT, 0);
+    gl.drawElements(gl.TRIANGLES, this._colorGeometry.indexCount, gl.UNSIGNED_SHORT, 0);
   }
 
   /**
@@ -909,7 +976,7 @@ class CubeGeometryHelper {
    * @param {Array} normalizedSlices - Array of normalized [min, max] ranges for each axis
    * @returns {Array} Array of 8 corners, each with [x, y, z, colorCoord0, colorCoord1, colorCoord2]
    */
-  static generateCubeCorners(size, normalizedSlices) {
+  static generateCubeCornerColors(normalizedSlices) {
     const corners = [];
 
     // Generate 8 corners using 3-bit patterns: 000, 001, 010, 011, 100, 101, 110, 111
@@ -919,14 +986,31 @@ class CubeGeometryHelper {
         normalizedSlices[1][(i & 2) >> 1],  // y axis
         normalizedSlices[2][(i & 4) >> 2]   // z axis
       ];
-
-      // Position coordinates - map color coord to cube position
-      const positions = colorCoords.map(coord => (coord - 0.5) * size);
-
-      corners.push([...positions, ...colorCoords]);
+      corners.push(colorCoords);
     }
 
     return corners;
+  }
+
+  /**
+   * Converts a color coordinate to a 3D position in the cube.
+   * @param {Array<number>} colorCoord
+   * @param {number} size
+   * @returns {Array<number>}
+   */
+  static colorCoordToPosition(colorCoord, size) {
+    return colorCoord.map(coord => (coord - 0.5) * size);
+  }
+
+  /**
+   * Converts a color coordinate to a vertex in 3D space.
+   * @param {Array<number>} colorCoord
+   * @param {number} size
+   * @returns {Array<number>}
+   */
+  static colorCoordToVertex(colorCoord, size) {
+    const position = CubeGeometryHelper.colorCoordToPosition(colorCoord, size);
+    return [...position, ...colorCoord];
   }
 
   /**
@@ -957,7 +1041,7 @@ class CubeGeometryHelper {
 
   /**
    * Generate wireframe indices for a cube's 12 edges
-   * @returns {Uint16Array} Array of line indices for wireframe rendering
+   * @returns {Array<number>} Array of line indices for wireframe rendering
    */
   static generateWireframeIndices() {
     const indices = [];
@@ -977,6 +1061,27 @@ class CubeGeometryHelper {
       if (i & 4) indices.push(i, i ^ 4);
     }
 
-    return new Uint16Array(indices);
+    return indices;
   }
+}
+
+/**
+ * Sorts the vertices of a 2d polygon (array of vec2)
+ * @param {Array<vec2>} vertices - The vertices to sort.
+ * @returns {Array<number>} The indexes of the sorted vertices.
+ */
+function polygonVertexSortOrder(vertices) {
+  const n = vertices.length;
+
+  // Calculate the centroid
+  const centerX = vertices.reduce((sum, v) => sum + v[0], 0) / n;
+  const centerY = vertices.reduce((sum, v) => sum + v[1], 0) / n;
+
+  // Sort vertices based on their angle from the center
+  return vertices.map((v, i) => ({
+    index: i,
+    angle: Math.atan2(v[1] - centerY, v[0] - centerX)
+  }))
+    .sort((a, b) => a.angle - b.angle)
+    .map(v => v.index);
 }
