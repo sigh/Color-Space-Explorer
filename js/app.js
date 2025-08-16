@@ -59,10 +59,11 @@ class ColorSpaceExplorer {
     this._updateRenderer(); // No deferral
   }
 
-  _updateRenderer(options) {
+  _updateRenderer() {
     if (!this._renderer) return;
     const colorSpaceConfig = this._configController.getCurrentColorSpaceConfig();
     const paletteColors = this._colorPalette.getColors();
+    const highlightColor = this._colorPalette.getHighlightColor();
 
     // Update 3D state from config
     if (this._render3d !== colorSpaceConfig.render3d) {
@@ -75,14 +76,14 @@ class ColorSpaceExplorer {
       this._renderer.render3DColorSpace(
         colorSpaceConfig,
         paletteColors,
-        options?.highlightIndex,
+        highlightColor,
         this._canvasUI.getRotationMatrix()
       );
     } else {
       this._renderer.renderColorSpace(
         colorSpaceConfig,
         paletteColors,
-        options?.highlightIndex
+        highlightColor
       );
     }
 

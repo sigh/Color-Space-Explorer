@@ -120,20 +120,16 @@ export class ColorPalette {
     this._addButton = addButton;
     this._colorDisplay = colorDisplay;
     this._onUpdate = onUpdate || (() => { });
+    this._highlightColor = null; // Track current highlighted color
+    this._highlightIsSticky = false; // Track if highlight is sticky from click
     this._initializeUI();
-    this._currentHighlight = null;
   }
 
   /**
    * Initialize the palette UI structure and controls
    */
   _initializeUI() {
-    // Register with color display for button state changes
-    this._colorDisplay.onColorChange(() => {
-      this._updateAddButtonState();
-
-      this._updateHighlightedColor();
-    });
+    this._setupColorDisplay();
 
     // Clear existing content
     clearElement(this.container);
@@ -172,19 +168,29 @@ export class ColorPalette {
     this._renderColors();
   }
 
-  _updateHighlightedColor() {
-    const [_, closestColor] = this._colorDisplay.getCurrentColors();
-    if (closestColor !== this._currentHighlight) {
-      if (this._currentHighlight !== null) {
-        this._getElementForColor(
-          this._currentHighlight)?.classList.remove('color-item-highlighted');
+  /**
+   * Register with color display for button state changes
+   */
+  _setupColorDisplay() {
+    let currentClosestColor = null;
+
+    this._colorDisplay.onColorChange(() => {
+      this._updateAddButtonState();
+
+      const [_, closestColor] = this._colorDisplay.getCurrentColors();
+
+      if (closestColor !== currentClosestColor) {
+        if (currentClosestColor !== null) {
+          this._getElementForColor(
+            currentClosestColor)?.classList.remove('closest-color-item');
+        }
+        if (closestColor !== null) {
+          this._getElementForColor(
+            closestColor)?.classList.add('closest-color-item');
+        }
+        currentClosestColor = closestColor;
       }
-      if (closestColor !== null) {
-        this._getElementForColor(
-          closestColor)?.classList.add('color-item-highlighted');
-      }
-      this._currentHighlight = closestColor;
-    }
+    });
   }
 
   /**
@@ -223,6 +229,8 @@ export class ColorPalette {
     // Add change event listener
     dropdown.addEventListener('change', (event) => {
       this._colors = [...getPreset(event.target.value)];
+      this._highlightColor = null; // Clear highlight when changing presets
+      this._highlightIsSticky = false;
       this._renderColors();
       this._onUpdate();
     });
@@ -278,15 +286,38 @@ export class ColorPalette {
 
       // Add hover event listeners for highlighting
       colorItem.addEventListener('mouseenter', () => {
-        window.clearTimeout(highlightUnsetTimeout);
-        this._onUpdate({ highlightIndex: i });
+        if (!this._highlightIsSticky) {
+          window.clearTimeout(highlightUnsetTimeout);
+          this._highlightColor = color;
+          this._onUpdate();
+        }
       });
 
       colorItem.addEventListener('mouseleave', () => {
         window.clearTimeout(highlightUnsetTimeout);
         highlightUnsetTimeout = window.setTimeout(() => {
-          this._onUpdate({ highlightIndex: null });
+          if (!this._highlightIsSticky) {
+            this._highlightColor = null;
+            this._onUpdate();
+          }
         }, 100); // Delay to avoid flickering
+      });
+
+      // Add click event listener for sticky highlighting
+      colorItem.addEventListener('click', () => {
+        if (this._highlightIsSticky && this._highlightColor !== color) {
+          // Remove highlighting from previously highlighted color (if it's different)
+          const index = this._colors.indexOf(this._highlightColor);
+          const previousColorItem = this._colorList.children[index];
+          previousColorItem?.classList.remove('highlighted-color-item');
+          this._highlightIsSticky = false;
+        }
+
+        this._highlightIsSticky = !this._highlightIsSticky;
+        colorItem.classList.toggle('highlighted-color-item', this._highlightIsSticky);
+        this._highlightColor = color;
+
+        this._onUpdate();
       });
 
       this._colorList.appendChild(colorItem);
@@ -300,6 +331,11 @@ export class ColorPalette {
   _deleteColor(colorToDelete) {
     const index = this._colors.indexOf(colorToDelete);
     if (index !== -1) {
+      // Clear highlight if deleting the highlighted color
+      if (this._highlightColor === colorToDelete) {
+        this._highlightColor = null;
+        this._highlightIsSticky = false;
+      }
       this._colors.splice(index, 1);
       this._setCustomState();
       this._renderColors();
@@ -315,8 +351,13 @@ export class ColorPalette {
   _editColorName(color, newName) {
     const index = this._colors.indexOf(color);
     if (index !== -1 && newName.trim()) {
+      const newColor = new NamedColor(newName.trim(), color.rgbColor);
+      // Update highlight reference if this was the highlighted color
+      if (this._highlightColor === color) {
+        this._highlightColor = newColor;
+      }
       // Update the color's name
-      this._colors[index] = new NamedColor(newName.trim(), color.rgbColor);
+      this._colors[index] = newColor;
       this._setCustomState();
       this._renderColors();
       this._onUpdate();
@@ -406,5 +447,13 @@ export class ColorPalette {
    */
   getColors() {
     return [...this._colors];
+  }
+
+  /**
+   * Get the current highlighted color
+   * @returns {NamedColor|null} Current highlighted color or null if no highlight
+   */
+  getHighlightColor() {
+    return this._highlightColor;
   }
 }

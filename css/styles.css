@@ -195,11 +195,21 @@ h3 {
   }
 }
 
-.color-item.color-item-highlighted {
+.closest-color-item {
+  box-shadow: inset 0 0 0 4px var(--accent-primary);
+  background: var(--bg-surface);
+}
+
+.closest-color-item:hover {
+  box-shadow: inset 0 0 0 4px var(--accent-hover);
+  background: var(--bg-surface-hover);
+}
+
+.highlighted-color-item {
   background: var(--accent-primary);
 }
 
-.color-item.color-item-highlighted:hover {
+.highlighted-color-item:hover {
   background: var(--accent-hover);
 }
 

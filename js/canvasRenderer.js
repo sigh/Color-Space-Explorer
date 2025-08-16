@@ -431,11 +431,15 @@ export class CanvasRenderer {
    * Render a 3D face representing the color space
    * @param {ColorSpaceConfig} colorSpaceConfig
    * @param {Array<NamedColor>} paletteColors - Array of palette colors to find closest matches for
-   * @param {number|null} highlightPaletteIndex - Index of palette color to highlight (null for no highlight)
+   * @param {NamedColor|null} highlightColor - Color object to highlight (null for no highlight)
    */
-  renderColorSpace(colorSpaceConfig, paletteColors = [], highlightPaletteIndex = null) {
+  renderColorSpace(colorSpaceConfig, paletteColors = [], highlightColor = null) {
     // Store palette colors for consistency with indices
     this._paletteColors = [...paletteColors];
+
+    // Calculate highlight index from color object
+    const highlightPaletteIndex = this._findHighlightPaletteIndex(
+      paletteColors, highlightColor);
 
     // Regenerate 2D face geometry
     const { vertices, indices } = this._generateFaceGeometry(colorSpaceConfig);
@@ -460,12 +464,16 @@ export class CanvasRenderer {
    * Render a 3D color space cube with rotation (same functionality as CubeRenderer)
    * @param {ColorSpaceConfig} colorSpaceConfig
    * @param {Array<NamedColor>} paletteColors - Array of palette colors to find closest matches for
-   * @param {number|null} highlightPaletteIndex - Index of palette color to highlight (null for no highlight)
+   * @param {NamedColor|null} highlightColor - Color object to highlight (null for no highlight)
    * @param {Float32Array} rotationMatrix - 4x4 rotation matrix for the cube
    */
-  render3DColorSpace(colorSpaceConfig, paletteColors = [], highlightPaletteIndex = null, rotationMatrix = null) {
+  render3DColorSpace(colorSpaceConfig, paletteColors = [], highlightColor = null, rotationMatrix = null) {
     // Store palette colors for consistency with indices
     this._paletteColors = [...paletteColors];
+
+    // Calculate highlight index from color object
+    const highlightPaletteIndex = this._findHighlightPaletteIndex(
+      paletteColors, highlightColor);
 
     // Get normalized axis slices and create 3D cube geometry
     const normalizedSlices = this._normalizedAxisSlices(colorSpaceConfig.colorSpace, colorSpaceConfig.axisSlices);
@@ -488,6 +496,16 @@ export class CanvasRenderer {
     this._renderWireframeOverlay(rotationMatrix);
 
     clearElement(this._axisContainer);
+  }
+
+  /**
+   * Find the index of a color object in the palette
+   * @param {Array<NamedColor>} paletteColors - Array of palette colors to search
+   * @param {NamedColor|null} highlightColor - Color object to find
+   * @returns {number} Index of the color in the palette, or -1 if not found/no highlight
+   */
+  _findHighlightPaletteIndex(paletteColors, highlightColor) {
+    return highlightColor ? paletteColors.indexOf(highlightColor) : -1;
   }
 
   /**
@@ -587,10 +605,10 @@ export class CanvasRenderer {
   /**
    * Render phase: Render framebuffer texture to canvas for display
    * @param {boolean} showBoundaries - Whether to show region boundaries
-   * @param {number|null} highlightPaletteIndex - Index of palette color to highlight (null for no highlight)
+   * @param {number} highlightPaletteIndex - Index of palette color to highlight (-1 for no highlight)
    * @param {string} highlightMode - Highlight mode ('dim-other' or 'hide-other')
    */
-  _renderToCanvas(showBoundaries = true, highlightPaletteIndex = null, highlightMode = 'dim-other') {
+  _renderToCanvas(showBoundaries = true, highlightPaletteIndex = -1, highlightMode = 'dim-other') {
     const gl = this._gl;
 
     // Bind default framebuffer (canvas)
@@ -616,8 +634,8 @@ export class CanvasRenderer {
     // Set boundaries visibility uniform
     gl.uniform1i(this._render.showBoundariesLocation, showBoundaries ? 1 : 0);
 
-    // Set highlight palette index uniform (convert null to -1 for shader)
-    gl.uniform1i(this._render.highlightPaletteIndexLocation, highlightPaletteIndex ?? -1);
+    // Set highlight palette index uniform
+    gl.uniform1i(this._render.highlightPaletteIndexLocation, highlightPaletteIndex);
 
     // Set highlight mode uniform (index into getAllHighlightModes array)
     const highlightModeIndex = getAllHighlightModes().indexOf(highlightMode);
