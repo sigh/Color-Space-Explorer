@@ -275,19 +275,25 @@ export class CanvasRenderer {
   /**
    * Generate wireframe geometry for the full unsliced cube
    * @param {Map} normalizedAxisSlices - The normalized axis slices for the wireframe
+   * @param {Map} normalizedAxisFull - The normalized axis for the full cube
    * @returns {Object} Object with vertices and indices arrays for wireframe rendering
    */
-  _generateWireframeCubeGeometry(normalizedAxisSlices) {
+  _generateWireframeCubeGeometry(normalizedAxisSlices, normalizedAxisFull) {
     const size = CUBE_SIZE_3D;
 
-    const corners = CubeGeometryHelper.generateCubeCornerColors(normalizedAxisSlices);
+    const sliceCorners = CubeGeometryHelper.generateCubeCornerColors(normalizedAxisSlices);
+    const fullCorners = CubeGeometryHelper.generateCubeCornerColors(normalizedAxisFull);
 
     // Extract only position data (first 3 components) for wireframe
-    const vertices = corners.map(
+    const vertices = [...sliceCorners, ...fullCorners].map(
       c => CubeGeometryHelper.colorCoordToPosition(c, size));
 
     // Generate line indices for wireframe (12 edges of the cube)
-    const indices = CubeGeometryHelper.generateWireframeIndices();
+    const cubeIndices = CubeGeometryHelper.generateWireframeIndices();
+    const numSliceVertices = sliceCorners.length;
+    const indices = [
+      ...cubeIndices,
+      ...cubeIndices.map(i => i + numSliceVertices)];
 
     return { vertices, indices };
   }
@@ -477,8 +483,8 @@ export class CanvasRenderer {
     this._colorGeometry = this._createGeometryBuffers(vertices, indices);
 
     // Generate wireframe geometry for the unsliced cube
-    const wireframeAxisSlices = this._normalizedAxisSlices(colorSpaceConfig.colorSpace, new Map());
-    const wireframeData = this._generateWireframeCubeGeometry(wireframeAxisSlices);
+    const normalizedFull = this._normalizedAxisSlices(colorSpaceConfig.colorSpace, new Map());
+    const wireframeData = this._generateWireframeCubeGeometry(normalizedSlices, normalizedFull);
     this._wireframeGeometry = this._createGeometryBuffers(
       wireframeData.vertices, wireframeData.indices);
 
