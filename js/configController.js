@@ -15,7 +15,7 @@ export class ColorSpaceConfig {
     distanceMetric = null,
     distanceThreshold = null,
     highlightMode = null,
-    hideUnmatchedColors = false) {
+    showUnmatchedColors = true) {
 
     this.colorSpace = colorSpace;
     this.axisSlices = axisSlices;
@@ -26,7 +26,7 @@ export class ColorSpaceConfig {
     this.distanceMetric = distanceMetric || getDefaultDistanceMetric();
     this.distanceThreshold = distanceThreshold ?? this.distanceMetric.defaultThreshold;
     this.highlightMode = highlightMode || getAllHighlightModes()[0];
-    this.hideUnmatchedColors = hideUnmatchedColors;
+    this.showUnmatchedColors = showUnmatchedColors;
 
     // Freeze the object to make it immutable
     Object.freeze(this);
@@ -71,7 +71,7 @@ export class ConfigController {
     this._boundariesToggle = container.querySelector('.boundaries-toggle');
 
     // Hide unmatched colors toggle element
-    this._hideUnmatchedToggle = container.querySelector('.hide-unmatched-toggle');
+    this._showUnmatchedToggle = container.querySelector('.show-unmatched-toggle');
 
     // Polar coordinates toggle element
     this._polarToggle = container.querySelector('.polar-toggle');
@@ -90,7 +90,7 @@ export class ConfigController {
       this._onColorViewUpdate();
     });
 
-    this._hideUnmatchedToggle.addEventListener('change', () => {
+    this._showUnmatchedToggle.addEventListener('change', () => {
       this._onColorViewUpdate();
     });
 
@@ -120,7 +120,7 @@ export class ConfigController {
       this._polarToggle.checked = initialColorSpaceConfig.usePolarCoordinates;
     }
     this._boundariesToggle.checked = initialColorSpaceConfig.showBoundaries;
-    this._hideUnmatchedToggle.checked = initialColorSpaceConfig.hideUnmatchedColors;
+    this._showUnmatchedToggle.checked = initialColorSpaceConfig.showUnmatchedColors;
 
     // Update visibility of 2D controls
     this._updateDimControlsVisibility();
@@ -428,7 +428,7 @@ export class ConfigController {
       metric,
       threshold,
       this._highlightModeDropdown.value,
-      this._hideUnmatchedToggle.checked
+      this._showUnmatchedToggle.checked
     );
   }
 }

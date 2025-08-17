@@ -167,7 +167,7 @@ export class CanvasRenderer {
       distanceThresholdLocation: gl.getUniformLocation(computeProgram, 'u_distanceThreshold'),
       highlightPaletteIndexLocation: gl.getUniformLocation(computeProgram, 'u_highlightPaletteIndex'),
       highlightModeLocation: gl.getUniformLocation(computeProgram, 'u_highlightMode'),
-      hideUnmatchedColorsLocation: gl.getUniformLocation(computeProgram, 'u_hideUnmatchedColors'),
+      showUnmatchedColorsLocation: gl.getUniformLocation(computeProgram, 'u_showUnmatchedColors'),
     };
 
     // Create and configure render program
@@ -474,7 +474,7 @@ export class CanvasRenderer {
     const { vertices, indices } = this._generate3DCubeGeometry(normalizedSlices);
 
     // Add internal slices if we can see inside of the cube.
-    if (colorSpaceConfig.hideUnmatchedColors || colorSpaceConfig.highlightMode === 'hide-other') {
+    if (colorSpaceConfig.showUnmatchedColors || colorSpaceConfig.highlightMode === 'hide-other') {
       const sliceGeometry = this._generateInternalGeometry(normalizedSlices, rotationMatrix);
       const vertexOffset = vertices.length;
       vertices.push(...sliceGeometry.vertices);
@@ -663,8 +663,10 @@ export class CanvasRenderer {
     const highlightModeIndex = getAllHighlightModes().indexOf(colorSpaceConfig.highlightMode);
     gl.uniform1i(this._compute.highlightModeLocation, highlightModeIndex >= 0 ? highlightModeIndex : 0);
 
-    // Set hide unmatched colors uniform
-    gl.uniform1i(this._compute.hideUnmatchedColorsLocation, colorSpaceConfig.hideUnmatchedColors ? 1 : 0);
+    // Set show unmatched colors uniform
+    gl.uniform1i(
+      this._compute.showUnmatchedColorsLocation,
+      colorSpaceConfig.showUnmatchedColors ? 1 : 0);
 
     // Draw using unified geometry
     gl.drawElements(gl.TRIANGLES, this._colorGeometry.indexCount, gl.UNSIGNED_SHORT, 0);

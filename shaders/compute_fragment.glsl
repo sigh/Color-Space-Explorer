@@ -8,7 +8,7 @@ uniform int u_distanceMetric; // 0=Delta E (LAB), 1=L*u*v* (Delta E), 2=RGB Eucl
 uniform float u_distanceThreshold; // Maximum distance for color matching
 uniform int u_highlightPaletteIndex; // Index of palette color to highlight (-1 = no highlight)
 uniform int u_highlightMode; // Index into getAllHighlightModes array (0 = dim-other, 1 = hide-other, 2 = boundary)
-uniform bool u_hideUnmatchedColors; // Whether to hide colors that don't match any palette color
+uniform bool u_showUnmatchedColors; // Whether to hide colors that don't match any palette color
 
 const int MAX_PALETTE_COLORS = 200;
 uniform vec3 u_paletteColors[MAX_PALETTE_COLORS]; // Maximum palette colors
@@ -247,7 +247,7 @@ void main() {
   }
 
   // Handle hide unmatched colors mode by discarding fragments with no matching palette color
-  if (u_hideUnmatchedColors && closestIndex == NO_MATCHING_COLOR) {
+  if (!u_showUnmatchedColors && closestIndex == NO_MATCHING_COLOR) {
     discard; // Completely remove fragments that don't match any palette color
   }
 
