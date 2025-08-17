@@ -69,14 +69,19 @@ export class RangeSlider {
   }
 
   /**
-   * Set up event listeners for mouse interactions
+   * Set up event listeners for pointer interactions
    * @private
    */
   _setupEventListeners() {
     let dragTarget = null;
+    let pointerId = null;
 
     const startDrag = (e) => {
       e.preventDefault();
+
+      // Capture the pointer to receive subsequent events
+      this._container.setPointerCapture(e.pointerId);
+      pointerId = e.pointerId;
 
       const x = e.clientX - this._container.getBoundingClientRect().left;
       const value = this._positionToValue(x);
@@ -92,12 +97,17 @@ export class RangeSlider {
       this._options.onChange(...this._values);
     };
 
-    const stopDrag = () => {
-      dragTarget = null;
+    const stopDrag = (e) => {
+      if (pointerId !== null && pointerId === e.pointerId) {
+        // Release the pointer capture
+        this._container.releasePointerCapture(e.pointerId);
+        dragTarget = null;
+        pointerId = null;
+      }
     };
 
-    const handleMouseMove = (e) => {
-      if (dragTarget === null) return;
+    const handlePointerMove = (e) => {
+      if (dragTarget === null || pointerId !== e.pointerId) return;
 
       const x = e.clientX - this._container.getBoundingClientRect().left;
       const value = this._positionToValue(x);
@@ -125,10 +135,11 @@ export class RangeSlider {
       this._options.onChange(...this._values);
     };
 
-    this._container.addEventListener('mousedown', startDrag);
+    this._container.addEventListener('pointerdown', startDrag);
+    this._container.addEventListener('pointermove', handlePointerMove);
+    this._container.addEventListener('pointerup', stopDrag);
+    this._container.addEventListener('pointercancel', stopDrag);
     this._container.addEventListener('dblclick', handleDoubleClick);
-    document.addEventListener('mousemove', handleMouseMove);
-    document.addEventListener('mouseup', stopDrag);
   }
 
   /**

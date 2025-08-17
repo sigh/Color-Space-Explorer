@@ -284,8 +284,8 @@ export class ColorPalette {
       );
 
 
-      // Add hover event listeners for highlighting
-      colorItem.addEventListener('mouseenter', () => {
+      // Add pointer event listeners for highlighting
+      colorItem.addEventListener('pointerenter', () => {
         if (!this._highlightIsSticky) {
           window.clearTimeout(highlightUnsetTimeout);
           this._highlightColor = color;
@@ -293,7 +293,7 @@ export class ColorPalette {
         }
       });
 
-      colorItem.addEventListener('mouseleave', () => {
+      colorItem.addEventListener('pointerleave', () => {
         window.clearTimeout(highlightUnsetTimeout);
         highlightUnsetTimeout = window.setTimeout(() => {
           if (!this._highlightIsSticky) {

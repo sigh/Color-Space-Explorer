@@ -27,31 +27,37 @@ export class CanvasUI {
   }
 
   /**
-   * Set up mouse event handlers for the canvas
+   * Set up pointer event handlers for the canvas
    */
   _setupMouseHandlers(canvasPanel) {
     let isDragging = false;
-    let lastMouseX = 0;
-    let lastMouseY = 0;
+    let lastPointerX = 0;
+    let lastPointerY = 0;
+    let activePrimaryPointerId = null;
 
     const setCursor = (isOverColor) => {
       if (isDragging && this._render3d) return;
       canvasPanel.style.cursor = isOverColor ? 'crosshair' : 'default';
     }
 
-    const mouseDownHandler = (event) => {
-      isDragging = true;
-      lastMouseX = event.clientX;
-      lastMouseY = event.clientY;
+    const pointerDownHandler = (event) => {
+      // Only handle primary pointer (first touch or left mouse button)
+      if (event.isPrimary) {
+        canvasPanel.setPointerCapture(event.pointerId);
+        activePrimaryPointerId = event.pointerId;
+        isDragging = true;
+        lastPointerX = event.clientX;
+        lastPointerY = event.clientY;
 
-      if (this._render3d) {
-        event.stopPropagation();
+        if (this._render3d) {
+          event.stopPropagation();
+        }
       }
     };
 
-    const mouseDragHandler = (event) => {
-      const deltaX = event.clientX - lastMouseX;
-      const deltaY = event.clientY - lastMouseY;
+    const pointerDragHandler = (event) => {
+      const deltaX = event.clientX - lastPointerX;
+      const deltaY = event.clientY - lastPointerY;
 
       // Create incremental rotation matrices and apply them to current rotation
       const rotationSpeed = 0.01;
@@ -71,56 +77,78 @@ export class CanvasUI {
       }
     }
 
-    const mouseMoveHandler = (event) => {
-      // Handle 3D rotation if dragging
-      if (isDragging) {
+    const pointerMoveHandler = (event) => {
+      // Handle 3D rotation if dragging with primary pointer
+      if (isDragging && event.pointerId === activePrimaryPointerId) {
         if (this._render3d) {
           canvasPanel.style.cursor = 'grab';
-          mouseDragHandler(event);
+          pointerDragHandler(event);
         }
 
-        lastMouseX = event.clientX;
-        lastMouseY = event.clientY;
+        lastPointerX = event.clientX;
+        lastPointerY = event.clientY;
       }
 
-      const [x, y] = this._getCanvasCoordsFromMouseEvent(event);
-      const [rgbColor, closestColor] = this._renderer.getColorAt(x, y);
-      setCursor(rgbColor !== null);
-
-      // Skip hover updates if there's a selection
-      if (this._selectionIndicator) {
-        if (event.target === this._selectionIndicator) {
-          // Change back to default to indicate that clicking will clear
-          // the selection.
-          setCursor(false);
-        }
-        return;
-      }
-
-      if (rgbColor === null) {
-        this._colorDisplay.clearColors();
-        return;
-      }
-
-      this._colorDisplay.setColors(rgbColor, closestColor);
-    };
-
-    const mouseUpHandler = (event) => {
-      isDragging = false;
-      if (this._render3d) {
-        const [x, y] = this._getCanvasCoordsFromMouseEvent(event);
-        const [rgbColor] = this._renderer.getColorAt(x, y);
+      // Only show hover effects for primary pointer (avoid issues with multi-touch)
+      if (event.isPrimary) {
+        const [x, y] = this._getCanvasCoordsFromPointerEvent(event);
+        const [rgbColor, closestColor] = this._renderer.getColorAt(x, y);
         setCursor(rgbColor !== null);
+
+        // Skip hover updates if there's a selection
+        if (this._selectionIndicator) {
+          if (event.target === this._selectionIndicator) {
+            // Change back to default to indicate that clicking will clear
+            // the selection.
+            setCursor(false);
+          }
+          return;
+        }
+
+        if (rgbColor === null) {
+          this._colorDisplay.clearColors();
+          return;
+        }
+
+        this._colorDisplay.setColors(rgbColor, closestColor);
       }
-      event.stopPropagation();
     };
 
-    const mouseLeaveHandler = (event) => {
-      isDragging = false;
-      canvasPanel.style.removeProperty('cursor');
-      // Skip clearing if there's a selection
-      if (this._selectionIndicator) return;
-      this._colorDisplay.clearColors();
+    const pointerUpHandler = (event) => {
+      if (event.pointerId === activePrimaryPointerId) {
+        canvasPanel.releasePointerCapture(event.pointerId);
+        isDragging = false;
+        activePrimaryPointerId = null;
+
+        if (this._render3d) {
+          const [x, y] = this._getCanvasCoordsFromPointerEvent(event);
+          const [rgbColor] = this._renderer.getColorAt(x, y);
+          setCursor(rgbColor !== null);
+        }
+        event.stopPropagation();
+      }
+    };
+
+    const pointerCancelHandler = (event) => {
+      if (event.pointerId === activePrimaryPointerId) {
+        isDragging = false;
+        activePrimaryPointerId = null;
+        canvasPanel.style.removeProperty('cursor');
+        // Skip clearing if there's a selection
+        if (this._selectionIndicator) return;
+        this._colorDisplay.clearColors();
+      }
+    };
+
+    const pointerLeaveHandler = (event) => {
+      if (event.pointerId === activePrimaryPointerId) {
+        isDragging = false;
+        activePrimaryPointerId = null;
+        canvasPanel.style.removeProperty('cursor');
+        // Skip clearing if there's a selection
+        if (this._selectionIndicator) return;
+        this._colorDisplay.clearColors();
+      }
     };
 
     // Click handler - only active in 2D mode
@@ -128,7 +156,7 @@ export class CanvasUI {
       if (this._render3d) return; // No click handling in 3D mode
 
       const selectionClicked = event.target === this._selectionIndicator;
-      const [x, y] = this._getCanvasCoordsFromMouseEvent(event);
+      const [x, y] = this._getCanvasCoordsFromPointerEvent(event);
       const [rgbColor, closestColor] = this._renderer.getColorAt(x, y);
 
       // Handle command-click or ctrl-click for direct color addition
@@ -157,10 +185,11 @@ export class CanvasUI {
       }
     };
 
-    canvasPanel.addEventListener('mousedown', mouseDownHandler);
-    canvasPanel.addEventListener('mousemove', mouseMoveHandler);
-    canvasPanel.addEventListener('mouseup', mouseUpHandler);
-    canvasPanel.addEventListener('mouseleave', mouseLeaveHandler);
+    canvasPanel.addEventListener('pointerdown', pointerDownHandler);
+    canvasPanel.addEventListener('pointermove', pointerMoveHandler);
+    canvasPanel.addEventListener('pointerup', pointerUpHandler);
+    canvasPanel.addEventListener('pointercancel', pointerCancelHandler);
+    canvasPanel.addEventListener('pointerleave', pointerLeaveHandler);
     canvasPanel.addEventListener('click', clickHandler);
   }
 
@@ -182,11 +211,11 @@ export class CanvasUI {
   }
 
   /**
-   * Get canvas coordinates from mouse event
-   * @param {MouseEvent} event - Mouse event
+   * Get canvas coordinates from pointer event
+   * @param {PointerEvent} event - Pointer event
    * @returns {Array<number>} Canvas coordinates as [x, y]
    */
-  _getCanvasCoordsFromMouseEvent(event) {
+  _getCanvasCoordsFromPointerEvent(event) {
     const rect = this._canvasContainer.getBoundingClientRect();
     const x = event.clientX - rect.left;
     const y = event.clientY - rect.top;
