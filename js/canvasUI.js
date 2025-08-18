@@ -35,6 +35,9 @@ export class CanvasUI {
     let lastPointerY = 0;
     let activePrimaryPointerId = null;
 
+    // Prevent default touch behaviors on the canvas (stops scrolling)
+    canvasPanel.style.touchAction = 'none';
+
     const setCursor = (isOverColor) => {
       if (isDragging && this._render3d) return;
       canvasPanel.style.cursor = isOverColor ? 'crosshair' : 'default';
@@ -43,15 +46,16 @@ export class CanvasUI {
     const pointerDownHandler = (event) => {
       // Only handle primary pointer (first touch or left mouse button)
       if (event.isPrimary) {
+        // Prevent scrolling and other default touch behaviors
+        // Prevent all default behaviors
+        event.preventDefault();
+        event.stopPropagation();
+
         canvasPanel.setPointerCapture(event.pointerId);
         activePrimaryPointerId = event.pointerId;
         isDragging = true;
         lastPointerX = event.clientX;
         lastPointerY = event.clientY;
-
-        if (this._render3d) {
-          event.stopPropagation();
-        }
       }
     };
 
@@ -80,6 +84,10 @@ export class CanvasUI {
     const pointerMoveHandler = (event) => {
       // Handle 3D rotation if dragging with primary pointer
       if (isDragging && event.pointerId === activePrimaryPointerId) {
+        // Prevent scrolling during drag operations
+        event.preventDefault();
+        event.stopPropagation();
+
         if (this._render3d) {
           canvasPanel.style.cursor = 'grab';
           pointerDragHandler(event);

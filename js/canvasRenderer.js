@@ -474,7 +474,7 @@ export class CanvasRenderer {
     const { vertices, indices } = this._generate3DCubeGeometry(normalizedSlices);
 
     // Add internal slices if we can see inside of the cube.
-    if (colorSpaceConfig.showUnmatchedColors || colorSpaceConfig.highlightMode === 'hide-other') {
+    if (!colorSpaceConfig.showUnmatchedColors || colorSpaceConfig.highlightMode === 'hide-other') {
       const sliceGeometry = this._generateInternalGeometry(normalizedSlices, rotationMatrix);
       const vertexOffset = vertices.length;
       vertices.push(...sliceGeometry.vertices);

@@ -73,11 +73,15 @@ export class RangeSlider {
    * @private
    */
   _setupEventListeners() {
+    // Prevent default touch behaviors on the slider
+    this._container.style.touchAction = 'none';
+
     let dragTarget = null;
     let pointerId = null;
 
     const startDrag = (e) => {
       e.preventDefault();
+      e.stopPropagation();
 
       // Capture the pointer to receive subsequent events
       this._container.setPointerCapture(e.pointerId);
@@ -108,6 +112,10 @@ export class RangeSlider {
 
     const handlePointerMove = (e) => {
       if (dragTarget === null || pointerId !== e.pointerId) return;
+
+      // Prevent scrolling during slider drag
+      e.preventDefault();
+      e.stopPropagation();
 
       const x = e.clientX - this._container.getBoundingClientRect().left;
       const value = this._positionToValue(x);
