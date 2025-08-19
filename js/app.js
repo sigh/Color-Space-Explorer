@@ -128,7 +128,7 @@ class URLStateManager {
 
     const regionsParam = colorSpaceConfig.showBoundaries ? '' : '&noregions';
     const showUnmatchedParam = colorSpaceConfig.showUnmatchedColors ? '' : '&onlymatched';
-    const polarParam = (!colorSpaceConfig.render3d && colorSpaceConfig.usePolarCoordinates) ? '&polar' : '';
+    const polarParam = colorSpaceConfig.usePolarCoordinates ? '&polar' : '';
 
     // Include 3D parameter if enabled
     const current3dParam = colorSpaceConfig.render3d ? '&3d' : '';

@@ -20,7 +20,8 @@ export class ColorSpaceConfig {
     this.colorSpace = colorSpace;
     this.axisSlices = axisSlices;
     this.render3d = render3d;
-    this.usePolarCoordinates = !render3d && usePolarCoordinates && colorSpace.availablePolarAxis(this.currentAxis);
+    this.usePolarCoordinates = usePolarCoordinates && !!colorSpace.availablePolarAxis(
+      render3d ? null : this.currentAxis);
 
     this.showBoundaries = showBoundaries;
     this.distanceMetric = distanceMetric || getDefaultDistanceMetric();
@@ -116,9 +117,7 @@ export class ConfigController {
     this._setupHighlightModeDropdown(initialColorSpaceConfig.highlightMode);
 
     // Set the current state from the config
-    if (!this._render3d) {
-      this._polarToggle.checked = initialColorSpaceConfig.usePolarCoordinates;
-    }
+    this._polarToggle.checked = initialColorSpaceConfig.usePolarCoordinates;
     this._boundariesToggle.checked = initialColorSpaceConfig.showBoundaries;
     this._showUnmatchedToggle.checked = initialColorSpaceConfig.showUnmatchedColors;
 

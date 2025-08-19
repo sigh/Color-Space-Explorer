@@ -218,8 +218,7 @@ void main() {
 
     // Check if we're outside the valid coordinate space (radius > 1)
     if (polarCoord.x > 1.0) {
-      fragColor = OUTSIDE_COLOR_SPACE;
-      return;
+      discard;
     }
 
     // Map polar coordinates: r -> rAxisIndex, theta -> thetaAxisIndex

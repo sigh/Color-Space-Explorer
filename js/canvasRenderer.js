@@ -298,38 +298,6 @@ export class CanvasRenderer {
     return { vertices, indices };
   }
 
-  _generate3DCubeGeometry(normalizedSlices) {
-    const size = CUBE_SIZE_3D;
-
-    // Generate all 8 corners of the cube with RGB color coordinates
-    const corners = CubeGeometryHelper.generateCubeCornerColors(
-      normalizedSlices).map(
-        c => CubeGeometryHelper.colorCoordToVertex(c, size));
-
-    // Generate faces programmatically - each face shares one coordinate
-    const vertices = [];
-    const indices = [];
-
-    // Generate 6 faces (3 axes × 2 directions each)
-    for (let axis = 0; axis < 3; axis++) {
-      for (let direction = 0; direction < 2; direction++) {
-        const baseIndex = vertices.length;
-
-        // Find the 4 corners that belong to this face
-        const faceCorners = CubeGeometryHelper.filterCornersByFace(
-          corners, axis, direction);
-
-        // Add vertices for this face
-        vertices.push(...faceCorners);
-
-        // Add triangles for this face (quad split into 2 triangles)
-        indices.push(...CubeGeometryHelper.generateFaceIndexes(baseIndex));
-      }
-    }
-
-    return { vertices, indices };
-  }
-
   /**
    * Generate 2d surface geometry data for a specific color space configuration
    * @param {ColorSpaceConfig} colorSpaceConfig - The color space configuration
@@ -469,9 +437,11 @@ export class CanvasRenderer {
     const highlightPaletteIndex = this._findHighlightPaletteIndex(
       paletteColors, highlightColor);
 
-    // Get normalized axis slices and create 3D cube geometry
+    // Get normalized axis slices and create 3D geometry
     const normalizedSlices = this._normalizedAxisSlices(colorSpaceConfig.colorSpace, colorSpaceConfig.axisSlices);
-    const { vertices, indices } = this._generate3DCubeGeometry(normalizedSlices);
+    const { vertices, indices } = colorSpaceConfig.usePolarCoordinates
+      ? CylinderGeometryHelper.generateCylinderGeometry(normalizedSlices)
+      : CubeGeometryHelper.generate3DCubeGeometry(normalizedSlices, CUBE_SIZE_3D);
 
     // Add internal slices if we can see inside of the cube.
     if (!colorSpaceConfig.showUnmatchedColors || colorSpaceConfig.highlightMode === 'hide-other') {
@@ -484,7 +454,10 @@ export class CanvasRenderer {
 
     // Generate wireframe geometry for the unsliced cube
     const normalizedFull = this._normalizedAxisSlices(colorSpaceConfig.colorSpace, new Map());
-    const wireframeData = this._generateWireframeCubeGeometry(normalizedSlices, normalizedFull);
+    // const wireframeData = this._generateWireframeCubeGeometry(normalizedSlices, normalizedFull);
+    const wireframeData = colorSpaceConfig.usePolarCoordinates ?
+      CylinderGeometryHelper.generateCylinderWireframe(normalizedFull) :
+      this._generateWireframeCubeGeometry(normalizedSlices, normalizedFull);
     this._wireframeGeometry = this._createGeometryBuffers(
       wireframeData.vertices, wireframeData.indices);
 
@@ -680,7 +653,8 @@ export class CanvasRenderer {
   _makePolarAxesVariable(colorSpaceConfig) {
     if (!colorSpaceConfig.usePolarCoordinates) return [-1, -1];
     const colorSpace = colorSpaceConfig.colorSpace;
-    const currentAxis = colorSpaceConfig.currentAxis;
+    const currentAxis =
+      colorSpaceConfig.render3d ? colorSpace.getAllAxes()[2] : colorSpaceConfig.currentAxis;
     const polarAxis = colorSpace.availablePolarAxis(currentAxis);
 
     const rAxis = colorSpace.getAllAxes().find(
@@ -1070,6 +1044,219 @@ class CubeGeometryHelper {
     }
 
     return indices;
+  }
+
+  /**
+   * Generate 3D cube geometry with all faces
+   * @param {Array} normalizedSlices - Array of normalized [min, max] ranges for each axis
+   * @param {number} size - Size of the cube
+   * @returns {Object} Object with vertices and indices arrays
+   */
+  static generate3DCubeGeometry(normalizedSlices, size) {
+    // Generate all 8 corners of the cube with RGB color coordinates
+    const corners = CubeGeometryHelper.generateCubeCornerColors(
+      normalizedSlices).map(
+        c => CubeGeometryHelper.colorCoordToVertex(c, size));
+
+    // Generate faces programmatically - each face shares one coordinate
+    const vertices = [];
+    const indices = [];
+
+    // Generate 6 faces (3 axes × 2 directions each)
+    for (let axis = 0; axis < 3; axis++) {
+      for (let direction = 0; direction < 2; direction++) {
+        const baseIndex = vertices.length;
+
+        // Find the 4 corners that belong to this face
+        const faceCorners = CubeGeometryHelper.filterCornersByFace(
+          corners, axis, direction);
+
+        // Add vertices for this face
+        vertices.push(...faceCorners);
+
+        // Add triangles for this face (quad split into 2 triangles)
+        indices.push(...CubeGeometryHelper.generateFaceIndexes(baseIndex));
+      }
+    }
+
+    return { vertices, indices };
+  }
+}
+
+class CylinderGeometryHelper {
+  // Static constants for cylinder configuration
+  static RADIAL_SEGMENTS = 16;
+  static CYLINDER_AXIS = 2; // Z-axis by default
+
+  /**
+   * Generate vertices for a cylinder with square ends along the Z-axis
+   * @param {Array} normalizedSlices - Array of normalized [min, max] ranges for each axis
+   * @returns {Object} Object with vertices and indices arrays
+   */
+  static generateCylinderGeometry(normalizedSlices) {
+    const vertices = [];
+    const indices = [];
+
+    // Use static constants
+    const cylinderAxis = CylinderGeometryHelper.CYLINDER_AXIS;
+    const radialSegments = CylinderGeometryHelper.RADIAL_SEGMENTS;
+
+    // Generate cube corners first to get exact same geometry as cube faces
+    const allCorners = CubeGeometryHelper.generateCubeCornerColors(normalizedSlices);
+    const allVertices = allCorners.map(c => CubeGeometryHelper.colorCoordToVertex(c, CUBE_SIZE_3D));
+
+    // Get bottom face (direction 0 for cylinderAxis)
+    const bottomFaceVertices = CubeGeometryHelper.filterCornersByFace(allVertices, cylinderAxis, 0);
+    vertices.push(...bottomFaceVertices);
+    indices.push(...CubeGeometryHelper.generateFaceIndexes(0));
+
+    // Get top face (direction 1 for cylinderAxis)
+    const topFaceVertices = CubeGeometryHelper.filterCornersByFace(allVertices, cylinderAxis, 1);
+    vertices.push(...topFaceVertices);
+    indices.push(...CubeGeometryHelper.generateFaceIndexes(4));
+
+    // Get the other two axes for the circular cross-section
+    const axis1 = (cylinderAxis + 1) % 3;
+    const axis2 = (cylinderAxis + 2) % 3;
+    const axis1Range = normalizedSlices[axis1];
+    const axis2Range = normalizedSlices[axis2];
+    const cylinderRange = normalizedSlices[cylinderAxis];
+    const cylinderMin = cylinderRange[0];
+    const cylinderMax = cylinderRange[1];
+
+    // Curved sides - segmented cylinder surface
+
+    // Part 1: Compute points on a 2D circle (with one extra point to avoid wrapping)
+    const circlePoints = [];
+    for (let r = 0; r <= radialSegments; r++) { // <= to include extra point
+      const angle = (r / radialSegments) * 2 * Math.PI;
+      const x1 = Math.cos(angle) * 0.5 + 0.5;
+      const y1 = Math.sin(angle) * 0.5 + 0.5;
+
+      // Map to axis ranges
+      const x = axis1Range[0] + (axis1Range[1] - axis1Range[0]) * x1;
+      const y = axis2Range[0] + (axis2Range[1] - axis2Range[0]) * y1;
+
+      circlePoints.push({ x, y });
+    }
+
+    const addCoord = (pos, level) => {
+      const colorCoord = [0, 0, 0];
+      colorCoord[axis1] = pos.x;
+      colorCoord[axis2] = pos.y;
+      colorCoord[cylinderAxis] = level;
+      vertices.push(CylinderGeometryHelper.colorCoordToVertex(colorCoord, CUBE_SIZE_3D));
+    };
+
+    // Part 2: Generate 3D triangles from circle points (independent of radialSegments)
+    for (let i = 1; i < circlePoints.length; i++) {
+      const current = circlePoints[i - 1];
+      const next = circlePoints[i];
+
+      // Add vertices for this segment (bottom and top for current and next positions)
+      const segmentStart = vertices.length;
+
+      addCoord(current, cylinderMin);
+      addCoord(next, cylinderMin);
+      addCoord(current, cylinderMax);
+      addCoord(next, cylinderMax);
+
+      // Create two triangles for this segment
+      const bottomCurrent = segmentStart;
+      const bottomNext = segmentStart + 1;
+      const topCurrent = segmentStart + 2;
+      const topNext = segmentStart + 3;
+
+      indices.push(bottomCurrent, bottomNext, topCurrent);
+      indices.push(bottomNext, topNext, topCurrent);
+    }
+
+    return { vertices, indices };
+  }
+
+  /**
+   * Generate wireframe geometry for a cylinder
+   * @param {Array} normalizedSlices - Array of normalized [min, max] ranges for each axis
+   * @returns {Object} Object with vertices and indices arrays for wireframe rendering
+   */
+  static generateCylinderWireframe(normalizedSlices) {
+    const vertices = [];
+    const indices = [];
+
+    // Use static constants
+    const cylinderAxis = CylinderGeometryHelper.CYLINDER_AXIS;
+    const radialSegments = CylinderGeometryHelper.RADIAL_SEGMENTS;
+
+    // Get the range along the cylinder axis
+    const cylinderRange = normalizedSlices[cylinderAxis];
+    const cylinderMin = cylinderRange[0];
+    const cylinderMax = cylinderRange[1];
+
+    // Get the other two axes for the circular cross-section
+    const axis1 = (cylinderAxis + 1) % 3;
+    const axis2 = (cylinderAxis + 2) % 3;
+    const axis1Range = normalizedSlices[axis1];
+    const axis2Range = normalizedSlices[axis2];
+
+    // Generate vertices for top and bottom circles
+    for (let level = 0; level < 2; level++) {
+      const cylinderPos = level === 0 ? cylinderMin : cylinderMax;
+
+      for (let r = 0; r < radialSegments; r++) {
+        const angle = (r / radialSegments) * 2 * Math.PI;
+        const u = Math.cos(angle) * 0.5 + 0.5;
+        const v = Math.sin(angle) * 0.5 + 0.5;
+
+        const pos1 = axis1Range[0] + (axis1Range[1] - axis1Range[0]) * u;
+        const pos2 = axis2Range[0] + (axis2Range[1] - axis2Range[0]) * v;
+
+        const colorCoord = [0, 0, 0];
+        colorCoord[cylinderAxis] = cylinderPos;
+        colorCoord[axis1] = pos1;
+        colorCoord[axis2] = pos2;
+
+        vertices.push(CylinderGeometryHelper.colorCoordToPosition(colorCoord, CUBE_SIZE_3D));
+      }
+    }
+
+    // Generate wireframe indices
+    // Circle edges for top and bottom
+    for (let level = 0; level < 2; level++) {
+      const baseIndex = level * radialSegments;
+      for (let r = 0; r < radialSegments; r++) {
+        const current = baseIndex + r;
+        const next = baseIndex + ((r + 1) % radialSegments);
+        indices.push(current, next);
+      }
+    }
+
+    // Vertical edges connecting top and bottom
+    for (let r = 0; r < radialSegments; r += Math.max(1, Math.floor(radialSegments / 4))) {
+      indices.push(r, r + radialSegments); // Connect bottom to top
+    }
+
+    return { vertices, indices };
+  }
+
+  /**
+   * Converts a color coordinate to a 3D position in the cylinder.
+   * @param {Array<number>} colorCoord
+   * @param {number} size
+   * @returns {Array<number>}
+   */
+  static colorCoordToPosition(colorCoord, size) {
+    return colorCoord.map(coord => (coord - 0.5) * size);
+  }
+
+  /**
+   * Converts a color coordinate to a vertex in 3D space.
+   * @param {Array<number>} colorCoord
+   * @param {number} size
+   * @returns {Array<number>}
+   */
+  static colorCoordToVertex(colorCoord, size) {
+    const position = CylinderGeometryHelper.colorCoordToPosition(colorCoord, size);
+    return [...position, ...colorCoord];
   }
 }
 
