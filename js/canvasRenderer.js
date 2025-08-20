@@ -8,7 +8,9 @@ import {
   generateCrossSections,
   generate2DFace,
   generateCylinderSurface,
-  generateCylinderWireframe
+  generateCylinderWireframe,
+  getRadialAxisOffset,
+  RADIAL_AXIS
 } from "./shapeMakers.js";
 
 // Import gl-matrix for efficient matrix operations
@@ -528,6 +530,11 @@ export class CanvasRenderer {
 
     // Set axis range uniform (normalize the axis slices to 0-1 range for shader)
     const normalizedSlices = this._normalizedAxisSlices(colorSpaceConfig.colorSpace, colorSpaceConfig.axisSlices);
+    if (colorSpaceConfig.usePolarCoordinates) {
+      // Correct for the fact that the rendering surfaces aren't perfect circles.
+      const radialOffset = getRadialAxisOffset(normalizedSlices[RADIAL_AXIS][0]);
+      normalizedSlices[RADIAL_AXIS][0] -= radialOffset;
+    }
     const axisRangeData = new Float32Array(normalizedSlices.flat());
     gl.uniform1fv(this._compute.axisRangeLocation, axisRangeData);
 

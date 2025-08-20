@@ -4,10 +4,25 @@ const { vec3 } = glMatrix;
 
 const CROSS_SECTION_SCALE = 1 / 64.0;
 const CYLINDER_RADIAL_SEGMENTS = 16;
-const CYLINDER_AXIS = 2; // Z-axis by default
+const CYLINDER_SEGMENT_ANGLE = (Math.PI * 2) / CYLINDER_RADIAL_SEGMENTS;
+const CYLINDER_SAGITTA = 1 - Math.sqrt((1 + Math.cos(CYLINDER_SEGMENT_ANGLE)) / 2);
 const CUBE_SIZE_3D = 1;
 
+export const ANGULAR_AXIS = 0;
+export const RADIAL_AXIS = 1;
+export const CYLINDER_AXIS = 2;
+
 const FULL_NORMALIZED_AXES = [[0, 1], [0, 1], [0, 1]];
+
+/**
+ * Determine how much to offset the radial axis range to ensure that circle
+ * sides remain within view.
+ * @param {number} diameter
+ * @returns {number}
+ */
+export function getRadialAxisOffset(diameter) {
+  return diameter * CYLINDER_SAGITTA;
+}
 
 /**
  * Generate 3D cube geometry with all faces
@@ -37,7 +52,7 @@ export function generateCubeSurface(normalizedSlices) {
       vertices.push(...faceCorners);
 
       // Add triangles for this face (quad split into 2 triangles)
-      indices.push(...generateCubeFaceIndexes(baseIndex));
+      indices.push(...generateFaceIndexes(baseIndex));
     }
   }
 
@@ -167,7 +182,7 @@ export function generate2DFace(normalizedAxisSlices, viewingAxisIndex, size) {
 
   // Create vertices array from corners and simple indices for single face
   const vertices = faceCorners;
-  const indices = generateCubeFaceIndexes(0);
+  const indices = generateFaceIndexes(0);
 
   return { vertices, indices };
 }
@@ -178,83 +193,69 @@ export function generate2DFace(normalizedAxisSlices, viewingAxisIndex, size) {
  * @returns {Object} Object with vertices and indices arrays
  */
 export function generateCylinderSurface(normalizedSlices) {
-  normalizedSlices = FULL_NORMALIZED_AXES;
-
   const vertices = [];
   const indices = [];
 
-  // Use static constants
-  const cylinderAxis = CYLINDER_AXIS;
-  const radialSegments = CYLINDER_RADIAL_SEGMENTS;
-
   // Generate cube corners first to get exact same geometry as cube faces
-  const allCorners = generateCubeCornerColors(normalizedSlices);
+  const faceSlices = [...FULL_NORMALIZED_AXES];
+  faceSlices[CYLINDER_AXIS] = normalizedSlices[CYLINDER_AXIS];
+  const allCorners = generateCubeCornerColors(faceSlices);
   const allVertices = allCorners.map(c => colorCoordToVertex(c, CUBE_SIZE_3D));
 
   // Get bottom face (direction 0 for cylinderAxis)
-  const bottomFaceVertices = filterCubeCornersByFace(allVertices, cylinderAxis, 0);
-  vertices.push(...bottomFaceVertices);
-  indices.push(...generateCubeFaceIndexes(0));
+  vertices.push(...filterCubeCornersByFace(allVertices, CYLINDER_AXIS, 0));
+  indices.push(...generateFaceIndexes(0));
 
   // Get top face (direction 1 for cylinderAxis)
-  const topFaceVertices = filterCubeCornersByFace(allVertices, cylinderAxis, 1);
-  vertices.push(...topFaceVertices);
-  indices.push(...generateCubeFaceIndexes(4));
+  vertices.push(...filterCubeCornersByFace(allVertices, CYLINDER_AXIS, 1));
+  indices.push(...generateFaceIndexes(4));
 
-  // Get the other two axes for the circular cross-section
-  const axis1 = (cylinderAxis + 1) % 3;
-  const axis2 = (cylinderAxis + 2) % 3;
-  const axis1Range = normalizedSlices[axis1];
-  const axis2Range = normalizedSlices[axis2];
-  const cylinderRange = normalizedSlices[cylinderAxis];
-  const cylinderMin = cylinderRange[0];
-  const cylinderMax = cylinderRange[1];
+  // Generate the cylinder body using segments.
+  const cylinderMin = normalizedSlices[CYLINDER_AXIS][0];
+  const cylinderMax = normalizedSlices[CYLINDER_AXIS][1];
 
-  // Curved sides - segmented cylinder surface
-
-  // Part 1: Compute points on a 2D circle (with one extra point to avoid wrapping)
-  const circlePoints = [];
-  for (let r = 0; r <= radialSegments; r++) { // <= to include extra point
-    const angle = (r / radialSegments) * 2 * Math.PI;
-    const x1 = Math.cos(angle) * 0.5 + 0.5;
-    const y1 = Math.sin(angle) * 0.5 + 0.5;
-
-    // Map to axis ranges
-    const x = axis1Range[0] + (axis1Range[1] - axis1Range[0]) * x1;
-    const y = axis2Range[0] + (axis2Range[1] - axis2Range[0]) * y1;
-
-    circlePoints.push({ x, y });
-  }
-
-  const addCoord = (pos, level) => {
-    const colorCoord = [0, 0, 0];
-    colorCoord[axis1] = pos.x;
-    colorCoord[axis2] = pos.y;
-    colorCoord[cylinderAxis] = level;
-    vertices.push(colorCoordToVertex(colorCoord, CUBE_SIZE_3D));
-  };
-
-  // Part 2: Generate 3D triangles from circle points (independent of radialSegments)
-  for (let i = 1; i < circlePoints.length; i++) {
-    const current = circlePoints[i - 1];
-    const next = circlePoints[i];
-
-    // Add vertices for this segment (bottom and top for current and next positions)
+  const generateCylinderBody = (circlePoints) => {
     const segmentStart = vertices.length;
 
-    addCoord(current, cylinderMin);
-    addCoord(next, cylinderMin);
-    addCoord(current, cylinderMax);
-    addCoord(next, cylinderMax);
+    for (let i = 0; i < circlePoints.length; i++) {
+      const pos = circlePoints[i];
+      vertices.push(colorCoordToVertex([pos.x, pos.y, cylinderMin], CUBE_SIZE_3D));
+      vertices.push(colorCoordToVertex([pos.x, pos.y, cylinderMax], CUBE_SIZE_3D));
+    }
 
-    // Create two triangles for this segment
-    const bottomCurrent = segmentStart;
-    const bottomNext = segmentStart + 1;
-    const topCurrent = segmentStart + 2;
-    const topNext = segmentStart + 3;
+    for (let i = 0; i < circlePoints.length - 1; i++) {
+      indices.push(...generateFaceIndexes(segmentStart + 2 * i));
+    }
+  };
 
-    indices.push(bottomCurrent, bottomNext, topCurrent);
-    indices.push(bottomNext, topNext, topCurrent);
+  const outerCirclePoints = generateCirclePoints(normalizedSlices[RADIAL_AXIS][1]);
+  generateCylinderBody(outerCirclePoints);
+  const innerDiameter = normalizedSlices[RADIAL_AXIS][0];
+  if (innerDiameter > 0) {
+    const innerCirclePoints = generateCirclePoints(innerDiameter);
+    generateCylinderBody(innerCirclePoints);
+  }
+
+  // Add internal surfaces if the slice is a wedge.
+  const minTurnAngle = normalizedSlices[ANGULAR_AXIS][0];
+  const maxTurnAngle = normalizedSlices[ANGULAR_AXIS][1];
+  if (minTurnAngle > 0 || maxTurnAngle < 1) {
+    const EPSILON = 0.001; // Small value to avoid precision issues
+    const radialRange = normalizedSlices[RADIAL_AXIS];
+    const cylinderRange = normalizedSlices[CYLINDER_AXIS];
+
+    indices.push(...generateFaceIndexes(vertices.length));
+    vertices.push(
+      ...generateCylinderWedgeCoords(minTurnAngle + EPSILON, radialRange, cylinderRange).map(
+        c => colorCoordToVertex(c, CUBE_SIZE_3D)
+      )
+    );
+    indices.push(...generateFaceIndexes(vertices.length));
+    vertices.push(
+      ...generateCylinderWedgeCoords(maxTurnAngle - EPSILON, radialRange, cylinderRange).map(
+        c => colorCoordToVertex(c, CUBE_SIZE_3D)
+      )
+    );
   }
 
   return { vertices, indices };
@@ -266,64 +267,97 @@ export function generateCylinderSurface(normalizedSlices) {
  * @returns {Object} Object with vertices and indices arrays for wireframe rendering
  */
 export function generateCylinderWireframe(normalizedSlices) {
-  normalizedSlices = FULL_NORMALIZED_AXES;
-
   const vertices = [];
   const indices = [];
 
-  // Use static constants
-  const cylinderAxis = CYLINDER_AXIS;
-  const radialSegments = CYLINDER_RADIAL_SEGMENTS;
+  // Generate the wireframe for the cylinder ends.
+  for (const ranges of [normalizedSlices, FULL_NORMALIZED_AXES]) {
+    const cylinderRange = ranges[CYLINDER_AXIS];
+    const radialRange = ranges[RADIAL_AXIS];
+    for (const d of radialRange) {
+      if (d === 0) continue;
+      const circlePoints = generateCirclePoints(d, ...ranges[ANGULAR_AXIS]);
+      const numPoints = circlePoints.length;
 
-  // Get the range along the cylinder axis
-  const cylinderRange = normalizedSlices[cylinderAxis];
-  const cylinderMin = cylinderRange[0];
-  const cylinderMax = cylinderRange[1];
+      // Draw the circle.
+      for (const cylinderPos of cylinderRange) {
+        const baseIndex = vertices.length;
+        for (let r = 0; r < numPoints; r++) {
+          const { x, y } = circlePoints[r];
 
-  // Get the other two axes for the circular cross-section
-  const axis1 = (cylinderAxis + 1) % 3;
-  const axis2 = (cylinderAxis + 2) % 3;
-  const axis1Range = normalizedSlices[axis1];
-  const axis2Range = normalizedSlices[axis2];
+          const colorCoord = [x, y, cylinderPos];
+          vertices.push(colorCoordToPosition(colorCoord, CUBE_SIZE_3D));
+        }
 
-  // Generate vertices for top and bottom circles
-  for (let level = 0; level < 2; level++) {
-    const cylinderPos = level === 0 ? cylinderMin : cylinderMax;
+        for (let r = 1; r < numPoints; r++) {
+          indices.push(baseIndex + r - 1, baseIndex + r);
+        }
+      }
 
-    for (let r = 0; r < radialSegments; r++) {
-      const angle = (r / radialSegments) * 2 * Math.PI;
-      const u = Math.cos(angle) * 0.5 + 0.5;
-      const v = Math.sin(angle) * 0.5 + 0.5;
-
-      const pos1 = axis1Range[0] + (axis1Range[1] - axis1Range[0]) * u;
-      const pos2 = axis2Range[0] + (axis2Range[1] - axis2Range[0]) * v;
-
-      const colorCoord = [0, 0, 0];
-      colorCoord[cylinderAxis] = cylinderPos;
-      colorCoord[axis1] = pos1;
-      colorCoord[axis2] = pos2;
-
-      vertices.push(colorCoordToPosition(colorCoord, CUBE_SIZE_3D));
     }
   }
 
-  // Generate wireframe indices
-  // Circle edges for top and bottom
-  for (let level = 0; level < 2; level++) {
-    const baseIndex = level * radialSegments;
-    for (let r = 0; r < radialSegments; r++) {
-      const current = baseIndex + r;
-      const next = baseIndex + ((r + 1) % radialSegments);
-      indices.push(current, next);
+  // Draw the wedge faces.
+  const angularRange = normalizedSlices[ANGULAR_AXIS];
+  const cylinderRange = normalizedSlices[CYLINDER_AXIS];
+  const radialRange = normalizedSlices[RADIAL_AXIS];
+  if (angularRange[0] > 0 || angularRange[1] < 1) {
+    for (const angularPos of angularRange) {
+      const baseIndex = vertices.length;
+      vertices.push(
+        ...generateCylinderWedgeCoords(angularPos, radialRange, cylinderRange).map(
+          c => colorCoordToPosition(c, CUBE_SIZE_3D)
+        )
+      );
+      indices.push(
+        baseIndex, baseIndex + 1,
+        baseIndex + 2, baseIndex + 3,
+        baseIndex, baseIndex + 2,
+        baseIndex + 1, baseIndex + 3);
     }
   }
 
-  // Vertical edges connecting top and bottom
-  for (let r = 0; r < radialSegments; r += Math.max(1, Math.floor(radialSegments / 4))) {
-    indices.push(r, r + radialSegments); // Connect bottom to top
+  // Draw 4 lines along the cylinder body
+  for (let r = 0; r < 1; r += 0.25) {
+    const { x, y } = polarToCartesian(1, r * 2 * Math.PI);
+    const baseIndex = vertices.length;
+    vertices.push(colorCoordToPosition([x, y, 0], CUBE_SIZE_3D));
+    vertices.push(colorCoordToPosition([x, y, 1], CUBE_SIZE_3D));
+    indices.push(baseIndex, baseIndex + 1);
   }
 
   return { vertices, indices };
+}
+
+/**
+ * Convert polar coordinates to Cartesian coordinates
+ * @param {*} d - The distance from the center
+ * @param {*} angle - The angle in radians
+ * @returns {Object} The Cartesian coordinates { x, y }
+ */
+function polarToCartesian(d, angle) {
+  return {
+    x: d * Math.sin(angle) / 2 + 0.5,
+    y: d * Math.cos(angle) / 2 + 0.5
+  };
+}
+
+/**
+ * Generate the coordinates for a wedge faces of the cylinder
+ * @param {number} angularPos - The angular position of the wedge (0 to 1)
+ * @param {Array} radialRange - The radial range [min, max] for the wedge
+ * @param {Array} cylinderRange - The cylinder range [min, max] for the wedge
+ * @returns {Array} Array of [x, y, z] coordinates for the wedge
+ */
+function generateCylinderWedgeCoords(angularPos, radialRange, cylinderRange) {
+  const coords = [];
+  const angle = angularPos * 2 * Math.PI;
+  for (const radialPos of radialRange) {
+    const { x, y } = polarToCartesian(radialPos, angle);
+    coords.push([x, y, cylinderRange[0]]);
+    coords.push([x, y, cylinderRange[1]]);
+  }
+  return coords;
 }
 
 /**
@@ -349,11 +383,11 @@ function generateCubeCornerColors(normalizedSlices) {
 }
 
 /**
- * Generate the indices for a single face of the cube
+ * Generate the indices for a single face
  * @param {number} baseIndex
  * @returns
  */
-function generateCubeFaceIndexes(baseIndex) {
+function generateFaceIndexes(baseIndex) {
   // Each face is a quad made of 2 triangles
   return [
     baseIndex, baseIndex + 1, baseIndex + 2,
@@ -397,6 +431,32 @@ function generateCubeWireframeIndices() {
   }
 
   return indices;
+}
+
+/**
+ * Generate points on a circle with specified diameter
+ * @param {number} diameter - Diameter of the circle (0.0 to 1.0)
+ * @returns {Array} Array of {x, y} points in [0, 1] range
+ */
+function generateCirclePoints(diameter, minTurnAngle = 0, maxTurnAngle = 1) {
+  const points = [];
+  const radius = diameter / 2;
+  const minAngle = minTurnAngle * Math.PI * 2;
+  const maxAngle = maxTurnAngle * Math.PI * 2;
+
+  for (let angle = minAngle; angle < maxAngle; angle += CYLINDER_SEGMENT_ANGLE) {
+    points.push({
+      x: Math.sin(angle) * radius + 0.5,
+      y: Math.cos(angle) * radius + 0.5
+    });
+  }
+
+  points.push({
+    x: Math.sin(maxAngle) * radius + 0.5,
+    y: Math.cos(maxAngle) * radius + 0.5
+  });
+
+  return points;
 }
 
 /**
