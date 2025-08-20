@@ -5,18 +5,20 @@ const { vec3 } = glMatrix;
 const CROSS_SECTION_SCALE = 1 / 64.0;
 const CYLINDER_RADIAL_SEGMENTS = 16;
 const CYLINDER_AXIS = 2; // Z-axis by default
+const CUBE_SIZE_3D = 1;
+
+const FULL_NORMALIZED_AXES = [[0, 1], [0, 1], [0, 1]];
 
 /**
  * Generate 3D cube geometry with all faces
  * @param {Array} normalizedSlices - Array of normalized [min, max] ranges for each axis
- * @param {number} size - Size of the cube
  * @returns {Object} Object with vertices and indices arrays
  */
-export function generateCubeSurface(normalizedSlices, size) {
+export function generateCubeSurface(normalizedSlices) {
   // Generate all 8 corners of the cube with RGB color coordinates
   const corners = generateCubeCornerColors(
     normalizedSlices).map(
-      c => colorCoordToVertex(c, size));
+      c => colorCoordToVertex(c, CUBE_SIZE_3D));
 
   // Generate faces programmatically - each face shares one coordinate
   const vertices = [];
@@ -45,17 +47,15 @@ export function generateCubeSurface(normalizedSlices, size) {
 /**
  * Generate wireframe geometry for the full unsliced cube
  * @param {Map} normalizedAxisSlices - The normalized axis slices for the wireframe
- * @param {Map} normalizedAxisFull - The normalized axis for the full cube
- * @param {number} size - Size of the cube
  * @returns {Object} Object with vertices and indices arrays for wireframe rendering
  */
-export function generateCubeWireframe(normalizedAxisSlices, normalizedAxisFull, size) {
+export function generateCubeWireframe(normalizedAxisSlices) {
   const sliceCorners = generateCubeCornerColors(normalizedAxisSlices);
-  const fullCorners = generateCubeCornerColors(normalizedAxisFull);
+  const fullCorners = generateCubeCornerColors(FULL_NORMALIZED_AXES);
 
   // Extract only position data (first 3 components) for wireframe
   const vertices = [...sliceCorners, ...fullCorners].map(
-    c => colorCoordToPosition(c, size));
+    c => colorCoordToPosition(c, CUBE_SIZE_3D));
 
   // Generate line indices for wireframe (12 edges of the cube)
   const cubeIndices = generateCubeWireframeIndices();
@@ -69,22 +69,20 @@ export function generateCubeWireframe(normalizedAxisSlices, normalizedAxisFull, 
 
 /**
  * Generate internal cross-sections of the cube, with surfaces facing the camera.
- * @param {Array} normalizedSlices - Normalized axis ranges
  * @param {Array} rotationMatrix - 4x4 rotation matrix
- * @param {number} size - Size of the cube
  * @returns {Object} Object with combined vertices and indices arrays
  */
-export function generateCrossSections(normalizedSlices, rotationMatrix, size) {
+export function generateCrossSections(rotationMatrix) {
   const vertices = [];
   const indices = [];
 
-  const cornerColors = generateCubeCornerColors(normalizedSlices);
+  const cornerColors = generateCubeCornerColors(FULL_NORMALIZED_AXES);
 
   // Transform corners to view space so that cross-sections are along the z-axis
   const rotatedCorners = cornerColors.map(corner => {
     return vec3.transformMat4(
       vec3.create(),
-      colorCoordToPosition(corner, size),
+      colorCoordToPosition(corner, CUBE_SIZE_3D),
       rotationMatrix);
   });
 
@@ -95,7 +93,7 @@ export function generateCrossSections(normalizedSlices, rotationMatrix, size) {
   const minZ = Math.min(...zValues);
   const maxZ = Math.max(...zValues);
 
-  const crossSectionWidth = size * CROSS_SECTION_SCALE;
+  const crossSectionWidth = CUBE_SIZE_3D * CROSS_SECTION_SCALE;
 
   // Generate cross-sections (exclude endpoints which are handled by cube faces)
   for (let z = minZ + crossSectionWidth; z < maxZ; z += crossSectionWidth) {
@@ -123,7 +121,7 @@ export function generateCrossSections(normalizedSlices, rotationMatrix, size) {
         const interpColor = cornerColors[startIndex].map(
           (v, j) => v + (cornerColors[endIndex][j] - v) * t);
         vertices.push(
-          colorCoordToVertex(interpColor, size));
+          colorCoordToVertex(interpColor, CUBE_SIZE_3D));
       }
     }
 
@@ -177,10 +175,11 @@ export function generate2DFace(normalizedAxisSlices, viewingAxisIndex, size) {
 /**
  * Generate vertices for a cylinder with square ends along the Z-axis
  * @param {Array} normalizedSlices - Array of normalized [min, max] ranges for each axis
- * @param {number} size - Size of the cube containing the cylinder
  * @returns {Object} Object with vertices and indices arrays
  */
-export function generateCylinderSurface(normalizedSlices, size) {
+export function generateCylinderSurface(normalizedSlices) {
+  normalizedSlices = FULL_NORMALIZED_AXES;
+
   const vertices = [];
   const indices = [];
 
@@ -190,7 +189,7 @@ export function generateCylinderSurface(normalizedSlices, size) {
 
   // Generate cube corners first to get exact same geometry as cube faces
   const allCorners = generateCubeCornerColors(normalizedSlices);
-  const allVertices = allCorners.map(c => colorCoordToVertex(c, size));
+  const allVertices = allCorners.map(c => colorCoordToVertex(c, CUBE_SIZE_3D));
 
   // Get bottom face (direction 0 for cylinderAxis)
   const bottomFaceVertices = filterCubeCornersByFace(allVertices, cylinderAxis, 0);
@@ -232,7 +231,7 @@ export function generateCylinderSurface(normalizedSlices, size) {
     colorCoord[axis1] = pos.x;
     colorCoord[axis2] = pos.y;
     colorCoord[cylinderAxis] = level;
-    vertices.push(colorCoordToVertex(colorCoord, size));
+    vertices.push(colorCoordToVertex(colorCoord, CUBE_SIZE_3D));
   };
 
   // Part 2: Generate 3D triangles from circle points (independent of radialSegments)
@@ -264,10 +263,11 @@ export function generateCylinderSurface(normalizedSlices, size) {
 /**
  * Generate wireframe geometry for a cylinder
  * @param {Array} normalizedSlices - Array of normalized [min, max] ranges for each axis
- * @param {number} size - Size of the cube containing the cylinder
  * @returns {Object} Object with vertices and indices arrays for wireframe rendering
  */
-export function generateCylinderWireframe(normalizedSlices, size) {
+export function generateCylinderWireframe(normalizedSlices) {
+  normalizedSlices = FULL_NORMALIZED_AXES;
+
   const vertices = [];
   const indices = [];
 
@@ -303,7 +303,7 @@ export function generateCylinderWireframe(normalizedSlices, size) {
       colorCoord[axis1] = pos1;
       colorCoord[axis2] = pos2;
 
-      vertices.push(colorCoordToPosition(colorCoord, size));
+      vertices.push(colorCoordToPosition(colorCoord, CUBE_SIZE_3D));
     }
   }
 

@@ -19,17 +19,15 @@ const OUTSIDE_COLOR_SPACE = 255;
 
 // Camera and projection constants
 const CAMERA_FOV = Math.PI / 3; // 60 degrees
-const CAMERA_DISTANCE = 2;
-
-const CUBE_SIZE_3D = 1.1;
+const CAMERA_DISTANCE = 1.8;
 
 /**
  * Calculate the size needed to fill the viewport at a given camera distance
  * @param {number} distance - Camera distance
- * @param {number} fov - Field of view in radians (optional, defaults to CAMERA_FOV)
+ * @param {number} fov - Field of view in radians
  * @returns {number} Size that fills the viewport
  */
-function calculateViewportSize(distance, fov = CAMERA_FOV) {
+function calculateViewportSize(distance, fov) {
   // For perspective projection: tan(fov/2) * distance * 2
   return Math.tan(fov / 2) * distance * 2;
 }
@@ -175,6 +173,7 @@ export class CanvasRenderer {
       highlightPaletteIndexLocation: gl.getUniformLocation(computeProgram, 'u_highlightPaletteIndex'),
       highlightModeLocation: gl.getUniformLocation(computeProgram, 'u_highlightMode'),
       showUnmatchedColorsLocation: gl.getUniformLocation(computeProgram, 'u_showUnmatchedColors'),
+      axisRangeLocation: gl.getUniformLocation(computeProgram, 'u_axis_range'),
     };
 
     // Create and configure render program
@@ -286,7 +285,7 @@ export class CanvasRenderer {
    */
   _generate2DSurfaceGeometry(colorSpaceConfig) {
     // Calculate size to fill the viewport at the 2D camera distance
-    const size = calculateViewportSize(CAMERA_DISTANCE);
+    const size = calculateViewportSize(CAMERA_DISTANCE, CAMERA_FOV);
 
     // Generate face based on the color space configuration using cube renderer techniques
     const colorSpace = colorSpaceConfig.colorSpace;
@@ -402,12 +401,12 @@ export class CanvasRenderer {
     // Get normalized axis slices and create 3D geometry
     const normalizedSlices = this._normalizedAxisSlices(colorSpaceConfig.colorSpace, colorSpaceConfig.axisSlices);
     const { vertices, indices } = colorSpaceConfig.usePolarCoordinates
-      ? generateCylinderSurface(normalizedSlices, CUBE_SIZE_3D)
-      : generateCubeSurface(normalizedSlices, CUBE_SIZE_3D);
+      ? generateCylinderSurface(normalizedSlices)
+      : generateCubeSurface(normalizedSlices);
 
     // Add internal slices if we can see inside of the cube.
     if (!colorSpaceConfig.showUnmatchedColors || colorSpaceConfig.highlightMode === 'hide-other') {
-      const sliceGeometry = generateCrossSections(normalizedSlices, rotationMatrix, CUBE_SIZE_3D);
+      const sliceGeometry = generateCrossSections(rotationMatrix);
       const vertexOffset = vertices.length;
       vertices.push(...sliceGeometry.vertices);
       indices.push(...sliceGeometry.indices.map(i => i + vertexOffset));
@@ -415,10 +414,9 @@ export class CanvasRenderer {
     this._colorGeometry = this._createGeometryBuffers(vertices, indices);
 
     // Generate wireframe geometry for the unsliced cube
-    const normalizedFull = this._normalizedAxisSlices(colorSpaceConfig.colorSpace, new Map());
     const wireframeData = colorSpaceConfig.usePolarCoordinates ?
-      generateCylinderWireframe(normalizedFull, CUBE_SIZE_3D) :
-      generateCubeWireframe(normalizedSlices, normalizedFull, CUBE_SIZE_3D);
+      generateCylinderWireframe(normalizedSlices) :
+      generateCubeWireframe(normalizedSlices);
     this._wireframeGeometry = this._createGeometryBuffers(
       wireframeData.vertices, wireframeData.indices);
 
@@ -527,6 +525,11 @@ export class CanvasRenderer {
     gl.uniform1i(
       this._compute.showUnmatchedColorsLocation,
       colorSpaceConfig.showUnmatchedColors ? 1 : 0);
+
+    // Set axis range uniform (normalize the axis slices to 0-1 range for shader)
+    const normalizedSlices = this._normalizedAxisSlices(colorSpaceConfig.colorSpace, colorSpaceConfig.axisSlices);
+    const axisRangeData = new Float32Array(normalizedSlices.flat());
+    gl.uniform1fv(this._compute.axisRangeLocation, axisRangeData);
 
     // Draw using unified geometry
     gl.drawElements(gl.TRIANGLES, this._colorGeometry.indexCount, gl.UNSIGNED_SHORT, 0);

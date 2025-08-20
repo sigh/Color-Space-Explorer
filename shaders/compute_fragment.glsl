@@ -9,6 +9,7 @@ uniform float u_distanceThreshold; // Maximum distance for color matching
 uniform int u_highlightPaletteIndex; // Index of palette color to highlight (-1 = no highlight)
 uniform int u_highlightMode; // Index into getAllHighlightModes array (0 = dim-other, 1 = hide-other, 2 = boundary)
 uniform bool u_showUnmatchedColors; // Whether to hide colors that don't match any palette color
+uniform float u_axis_range[6]; // [axis0_min, axis0_max, axis1_min, axis1_max, axis2_min, axis2_max]
 
 const int MAX_PALETTE_COLORS = 200;
 uniform vec3 u_paletteColors[MAX_PALETTE_COLORS]; // Maximum palette colors
@@ -224,6 +225,13 @@ void main() {
     // Map polar coordinates: r -> rAxisIndex, theta -> thetaAxisIndex
     colorCoord[u_polarAxes.x] = polarCoord.x; // radius
     colorCoord[u_polarAxes.y] = polarCoord.y; // angle (theta)
+  }
+
+  // Discard fragments outside the axis ranges
+  if (colorCoord.x < u_axis_range[0] || colorCoord.x > u_axis_range[1] ||
+      colorCoord.y < u_axis_range[2] || colorCoord.y > u_axis_range[3] ||
+      colorCoord.z < u_axis_range[4] || colorCoord.z > u_axis_range[5]) {
+    discard;
   }
 
   vec3 color;
