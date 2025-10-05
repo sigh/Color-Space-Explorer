@@ -8,41 +8,41 @@
 /* CSS Variables for consistent theming */
 :root {
   /* Backgrounds */
-  --bg-app: #111827;
-  --bg-panel: #1f2937;
-  --bg-surface: #374151;
-  --bg-surface-hover: #4b5563;
-  --bg-danger: #7f1d3a;
+  --bg-app: #0f1419;
+  --bg-panel: #1a202e;
+  --bg-surface: #2d3748;
+  --bg-surface-hover: #4a5568;
+  --bg-danger: #742a2a;
 
   /* Borders */
-  --border-default: #374151;
-  --border-hover: #6b7280;
-  --border-focus: #6366f1;
+  --border-default: #2d3748;
+  --border-hover: #718096;
+  --border-focus: #4299e1;
   --border-canvas: #ffffff;
 
   /* Text colors */
-  --text-title: #d1d5db;
-  --text-primary: #f9fafb;
-  --text-secondary: #d1d5db;
-  --text-muted: #9ca3af;
+  --text-title: #e2e8f0;
+  --text-primary: #f7fafc;
+  --text-secondary: #cbd5e0;
+  --text-muted: #a0aec0;
   --text-selected: #ffffff;
-  --text-unselected: #9ca3af;
-  --text-danger: #f87171;
+  --text-unselected: #a0aec0;
+  --text-danger: #fc8181;
 
   /* Interactive states */
-  --accent-primary: #6366f1;
-  --accent-hover: #5855eb;
+  --accent-primary: #4299e1;
+  --accent-hover: #3182ce;
 
   /* Add action colors */
   --add-action: #16a34a;
   --add-action-hover: #047857;
 
   /* Border radius */
-  --radius-textbox: 2px;
-  --radius-slider: 3px;
-  --radius-button: 4px;
-  --radius-surface: 6px;
-  --radius-toggle: 12px;
+  --radius-textbox: 3px;
+  --radius-slider: 5px;
+  --radius-button: 7px;
+  --radius-surface: 9px;
+  --radius-toggle: 14px;
 
   /* Typography */
   --font-mono: 'Monaco', monospace;
